@@ -16,9 +16,9 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
         <h3 className={`text-3xl md:text-5xl serif italic mb-6 font-light text-[#CDA235]`}>{t.newsletter}</h3>
         <p className="text-gray-400 text-[12px] md:text-[13px] mb-8 md:mb-12 tracking-wide font-light max-w-lg leading-relaxed">{t.newsletterSub}</p>
         <div className="flex flex-col sm:flex-row w-full max-w-xl gap-4 sm:gap-0">
-          <input 
-            type="email" 
-            placeholder={t.emailPlaceholder} 
+          <input
+            type="email"
+            placeholder={t.emailPlaceholder}
             className="bg-transparent flex-1 px-8 py-4 md:py-5 text-sm border border-white/10 text-gray-200 focus:outline-none focus:border-[#CDA235] transition-colors"
           />
           <button style={{ backgroundColor: brandGold }} className="text-white px-12 py-4 md:py-5 text-[11px] font-bold uppercase tracking-widest sm:ml-4 hover:opacity-90 transition-all shadow-xl">{t.subscribe}</button>
@@ -30,9 +30,9 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-20 mb-20 md:mb-32">
         <div className="flex flex-col gap-8 text-center md:text-left items-center md:items-start">
           <div className="flex justify-start">
-            <img 
-              src="https://files.catbox.moe/qef8ix.svg" 
-              alt="Bag Søjlen Logo" 
+            <img
+              src="https://files.catbox.moe/qef8ix.svg"
+              alt="Bag Søjlen Logo"
               crossOrigin="anonymous"
               style={{ filter: 'invert(100%)' }}
               className="h-12 md:h-14 w-auto object-contain"
@@ -81,7 +81,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
       <div className="flex flex-col md:flex-row justify-between items-center text-[10px] text-gray-600 uppercase tracking-widest pt-12 border-t border-white/5 gap-8 text-center md:text-left">
         <p>© 2024 BAG SØJLEN. {language === 'da' ? 'DANSK & FRANSK KØKKEN' : language === 'en' ? 'DANISH & FRENCH KITCHEN' : 'DÄNISCHE & FRANZÖSISCHE KÜCHE'}.</p>
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
-          <button 
+          <button
             onClick={() => onNavigate?.('manage')}
             style={{ borderColor: `${brandGold}44`, color: brandGold }}
             className="px-8 py-3 border hover:bg-[#CDA235] hover:text-white transition-all uppercase tracking-[0.3em] text-[10px] font-bold"
@@ -91,6 +91,7 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
           <div className="flex gap-10">
             <button onClick={() => onNavigate?.('privacy')} className="hover:text-[#CDA235] transition-colors">{t.privacy}</button>
             <button onClick={() => onNavigate?.('terms')} className="hover:text-[#CDA235] transition-colors">{language === 'da' ? 'HANDELSBETINGELSER' : 'TERMS'}</button>
+            <button onClick={() => onNavigate?.('admin')} className="text-gray-800 hover:text-[#CDA235]/50 transition-colors ml-4 text-[8px]" title="Admin">A</button>
           </div>
         </div>
       </div>

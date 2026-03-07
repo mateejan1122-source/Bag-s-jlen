@@ -6,10 +6,11 @@ import { EventDetail } from './pages/EventDetail';
 import ManageReservation from './pages/ManageReservation';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
+import { AdminDashboard } from './pages/AdminDashboard';
 import { BookingData } from './types';
 import { Language, translations } from './translations';
 
-type View = 'home' | 'event' | 'manage' | 'privacy' | 'terms';
+type View = 'home' | 'event' | 'manage' | 'privacy' | 'terms' | 'admin';
 
 interface AllergyModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ const AllergyModal: React.FC<AllergyModalProps> = ({ isOpen, onClose, language }
         <p className="text-xl serif text-[#1a1a1a] leading-relaxed mb-10 italic">
           {t.title}
         </p>
-        <button 
+        <button
           onClick={onClose}
           className="w-full bg-[#1a1a1a] text-white py-5 text-[11px] font-bold uppercase tracking-[0.4em] hover:bg-[#CDA235] transition-all shadow-xl"
         >
@@ -71,6 +72,7 @@ const App: React.FC = () => {
     else if (view === 'event') setCurrentView('event');
     else if (view === 'privacy') setCurrentView('privacy');
     else if (view === 'terms') setCurrentView('terms');
+    else if (view === 'admin') setCurrentView('admin');
   };
 
   const renderView = () => {
@@ -80,9 +82,9 @@ const App: React.FC = () => {
           <>
             <HomePart1 language={language} onBookingStart={handleBookingStart} />
             <HomePart2 language={language} onBookingStart={handleBookingStart} />
-            <HomePart3 
-              language={language} 
-              onBookingStart={handleBookingStart} 
+            <HomePart3
+              language={language}
+              onBookingStart={handleBookingStart}
               onNavigateToEvent={() => setCurrentView('event')}
               onBookingConfirmed={(data) => {
                 setConfirmedBooking(data);
@@ -98,6 +100,8 @@ const App: React.FC = () => {
         return <PrivacyPolicy language={language} />;
       case 'terms':
         return <Terms language={language} />;
+      case 'admin':
+        return <AdminDashboard language={language} />;
       default:
         return <HomePart1 language={language} onBookingStart={handleBookingStart} />;
     }
@@ -107,11 +111,11 @@ const App: React.FC = () => {
     <div className="bg-[#faf9f6] min-h-screen flex flex-col">
       <AllergyModal language={language} isOpen={showAllergyModal} onClose={handleAllergyConfirm} />
 
-      <Header 
-        language={language} 
-        onLanguageChange={setLanguage} 
-        onNavigate={handleNavigate} 
-        onBookingStart={handleBookingStart} 
+      <Header
+        language={language}
+        onLanguageChange={setLanguage}
+        onNavigate={handleNavigate}
+        onBookingStart={handleBookingStart}
       />
 
       <main className="flex-grow">
