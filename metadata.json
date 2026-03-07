@@ -1,0 +1,7 @@
+{
+  "name": "Bag Søjlen - Gastronomi i Rønde",
+  "description": "En komplet restaurant-applikation til Bag Søjlen i Rønde, inklusiv booking-flow, menukort og selskabsadministration.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
