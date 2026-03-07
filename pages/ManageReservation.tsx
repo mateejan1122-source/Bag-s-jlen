@@ -46,11 +46,6 @@ const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking,
       if (data && data.length > 0) {
         setActiveBooking(data[0]);
         setFlow('dashboard');
-      } else if (confirmedBooking &&
-        confirmedBooking.fullName.toLowerCase() === name.trim().toLowerCase() &&
-        confirmedBooking.email.toLowerCase() === email.trim().toLowerCase()) {
-        setActiveBooking(confirmedBooking);
-        setFlow('dashboard');
       } else {
         setError(language === 'da' ? 'Ingen reservation fundet med disse oplysninger.' : 'No reservation found with these details.');
       }
