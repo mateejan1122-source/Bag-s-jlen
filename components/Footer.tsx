@@ -91,7 +91,6 @@ export const Footer: React.FC<FooterProps> = ({ language, onNavigate }) => {
           <div className="flex gap-10">
             <button onClick={() => onNavigate?.('privacy')} className="hover:text-[#CDA235] transition-colors">{t.privacy}</button>
             <button onClick={() => onNavigate?.('terms')} className="hover:text-[#CDA235] transition-colors">{language === 'da' ? 'HANDELSBETINGELSER' : 'TERMS'}</button>
-            <button onClick={() => onNavigate?.('admin')} className="text-gray-800 hover:text-[#CDA235]/50 transition-colors ml-4 text-[8px]" title="Admin">A</button>
           </div>
         </div>
       </div>

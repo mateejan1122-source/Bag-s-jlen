@@ -26,13 +26,14 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
       <div className="max-w-[1440px] mx-auto flex items-center justify-between">
         {/* Left: Logo */}
         <div className="flex justify-start items-center">
-          <button 
+          <button
             onClick={() => { onNavigate('/'); setIsMobileMenuOpen(false); }}
+            onDoubleClick={() => { onNavigate('admin'); setIsMobileMenuOpen(false); }}
             className="flex items-center justify-center transition-transform hover:scale-105"
           >
-            <img 
-              src="https://files.catbox.moe/qef8ix.svg" 
-              alt="Bag Søjlen Logo" 
+            <img
+              src="https://files.catbox.moe/qef8ix.svg"
+              alt="Bag Søjlen Logo"
               crossOrigin="anonymous"
               style={{ filter: 'invert(100%)' }}
               className="h-10 md:h-16 w-auto object-contain"
@@ -52,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
             {t.events}
           </button>
           <button className="hover:text-[#c5a059] transition-colors whitespace-nowrap">{t.contact}</button>
-          
+
           {/* Language Switcher */}
           <div className="relative group ml-2">
             <button className="flex items-center gap-1.5 hover:text-[#c5a059] transition-colors">
@@ -67,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
             </div>
           </div>
         </nav>
-        
+
         {/* Right: CTA & Mobile Toggle */}
         <div className="flex items-center gap-2 md:gap-4">
           {/* Mobile Language Switcher */}
@@ -83,14 +84,14 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
             </div>
           </div>
 
-          <button 
+          <button
             onClick={onBookingStart}
             className="hidden sm:block bg-[#c5a059] text-white px-6 py-3 text-[9px] tracking-[0.2em] font-bold uppercase hover:bg-[#b48f4a] transition-all shadow-lg whitespace-nowrap"
           >
             {t.book}
           </button>
-          
-          <button 
+
+          <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="lg:hidden text-white p-2 hover:text-[#c5a059] transition-colors"
           >
@@ -110,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
           </nav>
 
           <div className="mt-auto pt-8">
-            <button 
+            <button
               onClick={() => { onBookingStart?.(); setIsMobileMenuOpen(false); }}
               className="w-full bg-[#c5a059] text-white py-5 text-xs tracking-[0.3em] font-bold uppercase shadow-2xl"
             >
