@@ -17,8 +17,12 @@ import { AppearanceTab } from './admin/AppearanceTab';
 type AdminTab = 'reservations' | 'menu' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'settings' | 'appearance';
 
 export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) => {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [userRole, setUserRole] = useState<'admin' | 'editor'>('admin');
+    const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        return sessionStorage.getItem('adminAuth') === 'true';
+    });
+    const [userRole, setUserRole] = useState<'admin' | 'editor'>(() => {
+        return (sessionStorage.getItem('adminRole') as 'admin' | 'editor') || 'admin';
+    });
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -52,6 +56,8 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
             if (username === currentUsername && password === currentPassword) {
                 setUserRole('admin');
                 setIsAuthenticated(true);
+                sessionStorage.setItem('adminAuth', 'true');
+                sessionStorage.setItem('adminRole', 'admin');
                 setError('');
                 fetchData();
             } else {
@@ -63,6 +69,13 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleLogout = () => {
+        setIsAuthenticated(false);
+        setUserRole('admin');
+        sessionStorage.removeItem('adminAuth');
+        sessionStorage.removeItem('adminRole');
     };
 
     const fetchData = () => {
@@ -208,7 +221,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                         <Globe size={18} />
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">View Site</span>
                     </button>
-                    <button onClick={() => setIsAuthenticated(false)} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-red-400 transition-colors">
+                    <button onClick={handleLogout} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-red-400 transition-colors">
                         <LogOut size={18} />
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Log Out</span>
                     </button>
