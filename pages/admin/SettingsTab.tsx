@@ -108,6 +108,33 @@ export const SettingsTab: React.FC = () => {
                 <div className="text-center py-16 text-gray-400 text-[12px] uppercase tracking-[0.4em] font-bold">Loading Settings...</div>
             ) : (
                 <div className="space-y-12 pb-24">
+                    {/* Security Information */}
+                    <div className="bg-white shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100 p-8">
+                        <h3 className="text-lg font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-8 border-b border-gray-100 pb-4">Admin Security</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Admin Username</label>
+                                <input
+                                    type="text"
+                                    value={settings['admin_username'] || ''}
+                                    onChange={e => handleSettingChange('admin_username', e.target.value)}
+                                    className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors"
+                                    placeholder="admin"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Admin Password</label>
+                                <input
+                                    type="text"
+                                    value={settings['admin_password'] || ''}
+                                    onChange={e => handleSettingChange('admin_password', e.target.value)}
+                                    className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors"
+                                    placeholder="8410"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Contact Information */}
                     <div className="bg-white shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100 p-8">
                         <h3 className="text-lg font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-8 border-b border-gray-100 pb-4">Contact Information</h3>

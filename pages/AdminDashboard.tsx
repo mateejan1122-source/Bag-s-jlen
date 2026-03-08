@@ -19,7 +19,8 @@ type AdminTab = 'reservations' | 'menu' | 'pages' | 'content' | 'events' | 'gall
 export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userRole, setUserRole] = useState<'admin' | 'editor'>('admin');
-    const [passcode, setPasscode] = useState('');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<AdminTab>('reservations');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -31,28 +32,31 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
     // UI States
     const [loading, setLoading] = useState(false);
 
-    const correctPasscode = '8410';
-
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            if (passcode === correctPasscode) {
+            // Fetch credentials from settings
+            const { data: settingsData } = await supabase.from('settings').select('*').in('key', ['admin_username', 'admin_password']);
+
+            let currentUsername = 'admin'; // fallback
+            let currentPassword = '8410'; // fallback
+
+            if (settingsData) {
+                const dbUser = settingsData.find(s => s.key === 'admin_username')?.value;
+                const dbPass = settingsData.find(s => s.key === 'admin_password')?.value;
+                if (dbUser) currentUsername = dbUser;
+                if (dbPass) currentPassword = dbPass;
+            }
+
+            if (username === currentUsername && password === currentPassword) {
                 setUserRole('admin');
                 setIsAuthenticated(true);
                 setError('');
                 fetchData();
             } else {
-                const { data, error } = await supabase.from('admin_users').select('*').eq('passcode', passcode).single();
-                if (error || !data) {
-                    setError(language === 'da' ? 'Forkert adgangskode' : 'Incorrect passcode');
-                    setPasscode('');
-                } else {
-                    setUserRole(data.role || 'editor');
-                    setIsAuthenticated(true);
-                    setError('');
-                    fetchData();
-                }
+                setError(language === 'da' ? 'Forkert brugernavn eller adgangskode' : 'Incorrect username or password');
+                setPassword('');
             }
         } catch (err) {
             setError('Login failed');
@@ -73,22 +77,29 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     <span className="text-[#CDA235] text-[10px] font-bold tracking-[0.4em] uppercase block mb-4">ADMINISTRATOR</span>
                     <h2 className="text-4xl serif italic text-[#1a1a1a] mb-12">Login</h2>
 
-                    <form onSubmit={handleLogin} className="space-y-8">
-                        <div className="flex flex-col gap-3">
+                    <form onSubmit={handleLogin} className="space-y-6">
+                        <div className="flex flex-col gap-4">
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="Username..."
+                                autoCapitalize="none"
+                                className="border-b border-gray-200 py-4 text-center text-xl outline-none focus:border-[#CDA235] serif bg-transparent"
+                            />
                             <input
                                 type="password"
-                                value={passcode}
-                                onChange={(e) => setPasscode(e.target.value)}
-                                placeholder="Passcode..."
-                                className="border-b border-gray-200 py-4 text-center text-2xl tracking-[0.5em] outline-none focus:border-[#CDA235] serif italic bg-transparent"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Password..."
+                                className="border-b border-gray-200 py-4 text-center text-xl tracking-[0.3em] outline-none focus:border-[#CDA235] serif italic bg-transparent mt-2"
                             />
                         </div>
-                        {error && <p className="text-red-500 text-xs italic">{error}</p>}
+                        {error && <p className="text-red-500 text-xs italic mt-2">{error}</p>}
                         <button
                             type="submit"
-                            disabled={passcode.length < 3}
-                            className={`w-full py-6 text-[11px] font-bold uppercase tracking-[0.5em] transition-all shadow-xl ${passcode.length >= 3 ? 'bg-[#1a1a1a] text-white hover:bg-[#CDA235]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                }`}
+                            disabled={!username || password.length < 3}
+                            className={`w-full py-6 mt-6 text-[11px] font-bold uppercase tracking-[0.5em] transition-all shadow-xl ${(!username || password.length < 3) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#1a1a1a] text-white hover:bg-[#CDA235]'}`}
                         >
                             Enter Dashboard
                         </button>
