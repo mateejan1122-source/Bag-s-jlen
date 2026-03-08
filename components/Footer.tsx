@@ -53,7 +53,7 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
   };
 
   return (
-    <footer className="bg-[#000000] text-white pt-16 md:pt-24 pb-12 md:pb-16 px-6 md:px-20">
+    <footer id="contact-section" className="bg-[#000000] text-white pt-16 md:pt-24 pb-12 md:pb-16 px-6 md:px-20">
       <div className="flex flex-col items-center mb-16 md:mb-24 text-center">
         <h3 className={`text-3xl md:text-5xl serif italic mb-6 font-light text-[#CDA235]`}>{t.newsletter}</h3>
         <p className="text-gray-400 text-[12px] md:text-[13px] mb-8 md:mb-12 tracking-wide font-light max-w-lg leading-relaxed">{t.newsletterSub}</p>

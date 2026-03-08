@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
           <button onClick={() => handleScrollTo('events-section')} className="hover:text-[#c5a059] transition-colors whitespace-nowrap">
             {t.events}
           </button>
-          <button className="hover:text-[#c5a059] transition-colors whitespace-nowrap">{t.contact}</button>
+          <button onClick={() => handleScrollTo('contact-section')} className="hover:text-[#c5a059] transition-colors whitespace-nowrap">{t.contact}</button>
 
           {headerPages.map(page => (
             <button key={page.id} onClick={() => { navigate(`/${page.slug}`); setIsMobileMenuOpen(false); }} className="hover:text-[#c5a059] transition-colors whitespace-nowrap">
@@ -130,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
             <button onClick={() => handleScrollTo('menu-section')} className="text-left py-2 border-b border-white/5">{t.menu}</button>
             <button onClick={() => handleScrollTo('history-section')} className="text-left py-2 border-b border-white/5">{t.history}</button>
             <button onClick={() => handleScrollTo('events-section')} className="text-left py-2 border-b border-white/5">{t.events}</button>
-            <button className="text-left py-2 border-b border-white/5">{t.contact}</button>
+            <button onClick={() => handleScrollTo('contact-section')} className="text-left py-2 border-b border-white/5">{t.contact}</button>
             {headerPages.map(page => (
               <button key={page.id} onClick={() => { navigate(`/${page.slug}`); setIsMobileMenuOpen(false); }} className="text-left py-2 border-b border-white/5">
                 {page.title}
