@@ -168,7 +168,9 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
       </div>
 
       <div className="flex flex-col md:flex-row justify-between items-center text-[10px] text-gray-600 uppercase tracking-widest pt-12 border-t border-white/5 gap-8 text-center md:text-left">
-        <p>© 2024 BAG SØJLEN. {language === 'da' ? 'DANSK & FRANSK KØKKEN' : language === 'en' ? 'DANISH & FRENCH KITCHEN' : 'DÄNISCHE & FRANZÖSISCHE KÜCHE'}.</p>
+        <p>
+          {settings.general_copyright ? settings.general_copyright : `© 2024 BAG SØJLEN. ${language === 'da' ? 'DANSK & FRANSK KØKKEN' : language === 'en' ? 'DANISH & FRENCH KITCHEN' : 'DÄNISCHE & FRANZÖSISCHE KÜCHE'}.`}
+        </p>
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
           <button
             onClick={() => navigate('/manage')}

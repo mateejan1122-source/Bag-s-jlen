@@ -135,6 +135,22 @@ export const SettingsTab: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* General Details */}
+                    <div className="bg-white shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100 p-8">
+                        <h3 className="text-lg font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-8 border-b border-gray-100 pb-4">General Details</h3>
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Copyright Line</label>
+                            <input
+                                type="text"
+                                value={settings['general_copyright'] || ''}
+                                onChange={e => handleSettingChange('general_copyright', e.target.value)}
+                                className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors"
+                                placeholder="© 2024 BAG SØJLEN. DANSK & FRANSK KØKKEN."
+                            />
+                            <p className="text-xs text-gray-400 mt-2">This text appears at the bottom of the website footer.</p>
+                        </div>
+                    </div>
+
                     {/* Contact Information */}
                     <div className="bg-white shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100 p-8">
                         <h3 className="text-lg font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-8 border-b border-gray-100 pb-4">Contact Information</h3>
