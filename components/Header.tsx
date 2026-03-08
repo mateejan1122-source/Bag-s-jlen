@@ -1,24 +1,41 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { Language, translations } from '../translations';
 import { Menu, X, Globe, ChevronDown } from 'lucide-react';
 
 interface HeaderProps {
-  onNavigate: (page: string) => void;
   onBookingStart?: () => void;
   language: Language;
   onLanguageChange: (lang: Language) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, language, onLanguageChange }) => {
+export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLanguageChange }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [headerPages, setHeaderPages] = useState<any[]>([]);
   const t = translations[language].nav;
 
+  React.useEffect(() => {
+    supabase.from('pages')
+      .select('id, title, slug')
+      .eq('is_published', true)
+      .eq('show_in_header', true)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data) setHeaderPages(data);
+      });
+  }, []);
+
   const handleScrollTo = (id: string) => {
-    onNavigate('/');
+    if (location.pathname !== '/') {
+      navigate('/');
+    }
     setIsMobileMenuOpen(false);
     setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+    }, location.pathname !== '/' ? 300 : 100);
   };
 
   return (
@@ -27,8 +44,8 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
         {/* Left: Logo */}
         <div className="flex justify-start items-center">
           <button
-            onClick={() => { onNavigate('/'); setIsMobileMenuOpen(false); }}
-            onDoubleClick={() => { onNavigate('admin'); setIsMobileMenuOpen(false); }}
+            onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }}
+            onDoubleClick={() => { navigate('/admin'); setIsMobileMenuOpen(false); }}
             className="flex items-center justify-center transition-transform hover:scale-105"
           >
             <img
@@ -53,6 +70,12 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
             {t.events}
           </button>
           <button className="hover:text-[#c5a059] transition-colors whitespace-nowrap">{t.contact}</button>
+
+          {headerPages.map(page => (
+            <button key={page.id} onClick={() => { navigate(`/${page.slug}`); setIsMobileMenuOpen(false); }} className="hover:text-[#c5a059] transition-colors whitespace-nowrap">
+              {page.title}
+            </button>
+          ))}
 
           {/* Language Switcher */}
           <div className="relative group ml-2">
@@ -108,6 +131,11 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onBookingStart, lang
             <button onClick={() => handleScrollTo('history-section')} className="text-left py-2 border-b border-white/5">{t.history}</button>
             <button onClick={() => handleScrollTo('events-section')} className="text-left py-2 border-b border-white/5">{t.events}</button>
             <button className="text-left py-2 border-b border-white/5">{t.contact}</button>
+            {headerPages.map(page => (
+              <button key={page.id} onClick={() => { navigate(`/${page.slug}`); setIsMobileMenuOpen(false); }} className="text-left py-2 border-b border-white/5">
+                {page.title}
+              </button>
+            ))}
           </nav>
 
           <div className="mt-auto pt-8">

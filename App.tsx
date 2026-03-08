@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { X } from 'lucide-react';
+import { supabase } from './lib/supabase';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePart1, HomePart2, HomePart3 } from './pages/HomeSplit';
@@ -7,23 +10,25 @@ import ManageReservation from './pages/ManageReservation';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { DynamicPage } from './pages/DynamicPage';
 import { BookingData } from './types';
 import { Language, translations } from './translations';
-
-type View = 'home' | 'event' | 'manage' | 'privacy' | 'terms' | 'admin';
-
 interface AllergyModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onCancel: () => void;
   language: Language;
 }
 
-const AllergyModal: React.FC<AllergyModalProps> = ({ isOpen, onClose, language }) => {
+const AllergyModal: React.FC<AllergyModalProps> = ({ isOpen, onClose, onCancel, language }) => {
   if (!isOpen) return null;
   const t = translations[language].allergy;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-[#faf9f6] max-w-md w-full p-12 shadow-2xl border border-gray-100 relative text-center">
+        <button onClick={onCancel} className="absolute top-6 right-6 text-gray-400 hover:text-[#CDA235] transition-colors z-50 p-2 cursor-pointer">
+          <X size={24} />
+        </button>
         <div className="absolute top-0 left-0 w-full h-[4px] bg-[#CDA235]"></div>
         <div className="text-[#CDA235] text-5xl serif italic mb-8">!</div>
         <p className="text-xl serif text-[#1a1a1a] leading-relaxed mb-10 italic">
@@ -41,15 +46,37 @@ const AllergyModal: React.FC<AllergyModalProps> = ({ isOpen, onClose, language }
 };
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('home');
   const [showAllergyModal, setShowAllergyModal] = useState(false);
   const [language, setLanguage] = useState<Language>('da');
   const [confirmedBooking, setConfirmedBooking] = useState<BookingData | null>(null);
+  const [scaleMenu, setScaleMenu] = useState('1');
+  const [scaleHeadings, setScaleHeadings] = useState('1');
+  const [scaleBody, setScaleBody] = useState('1');
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    supabase.from('settings').select('*')
+      .in('key', ['font_scale_menu', 'font_scale_headings', 'font_scale_body'])
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Font scale error:", error);
+        } else if (data) {
+          const sm = data.find(d => d.key === 'font_scale_menu')?.value;
+          const sh = data.find(d => d.key === 'font_scale_headings')?.value;
+          const sb = data.find(d => d.key === 'font_scale_body')?.value;
+          if (sm) setScaleMenu(sm);
+          if (sh) setScaleHeadings(sh);
+          if (sb) setScaleBody(sb);
+        }
+      });
+  }, []);
 
   // Scroll to top on view change
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [currentView]);
+  }, [location.pathname]);
 
   const handleBookingStart = () => {
     setShowAllergyModal(true);
@@ -57,8 +84,8 @@ const App: React.FC = () => {
 
   const handleAllergyConfirm = () => {
     setShowAllergyModal(false);
-    if (currentView !== 'home') {
-      setCurrentView('home');
+    if (location.pathname !== '/') {
+      navigate('/');
     }
     // Small delay to ensure we are on home page before scrolling
     setTimeout(() => {
@@ -66,64 +93,59 @@ const App: React.FC = () => {
     }, 100);
   };
 
-  const handleNavigate = (view: string) => {
-    if (view === '/') setCurrentView('home');
-    else if (view === 'manage') setCurrentView('manage');
-    else if (view === 'event') setCurrentView('event');
-    else if (view === 'privacy') setCurrentView('privacy');
-    else if (view === 'terms') setCurrentView('terms');
-    else if (view === 'admin') setCurrentView('admin');
-  };
-
-  const renderView = () => {
-    switch (currentView) {
-      case 'home':
-        return (
-          <>
-            <HomePart1 language={language} onBookingStart={handleBookingStart} />
-            <HomePart2 language={language} onBookingStart={handleBookingStart} />
-            <HomePart3
-              language={language}
-              onBookingStart={handleBookingStart}
-              onNavigateToEvent={() => setCurrentView('event')}
-              onBookingConfirmed={(data) => {
-                setConfirmedBooking(data);
-              }}
-            />
-          </>
-        );
-      case 'event':
-        return <EventDetail language={language} onBookingStart={handleBookingStart} />;
-      case 'manage':
-        return <ManageReservation language={language} confirmedBooking={confirmedBooking} initialFlow="verify" />;
-      case 'privacy':
-        return <PrivacyPolicy language={language} />;
-      case 'terms':
-        return <Terms language={language} />;
-      case 'admin':
-        return <AdminDashboard language={language} />;
-      default:
-        return <HomePart1 language={language} onBookingStart={handleBookingStart} />;
-    }
-  };
-
   return (
-    <div className="bg-[#faf9f6] min-h-screen flex flex-col">
-      <AllergyModal language={language} isOpen={showAllergyModal} onClose={handleAllergyConfirm} />
+    <>
+      <style>{`
+        header nav, footer {
+          zoom: ${scaleMenu};
+        }
+        .scalable-content h1, .scalable-content h2, .scalable-content h3, .scalable-content h4, .scalable-content h5, .scalable-content h6, .scalable-content .heading-zoom {
+          zoom: ${scaleHeadings};
+        }
+        .scalable-content p, .scalable-content li {
+          zoom: ${scaleBody};
+        }
+      `}</style>
+      <div className="bg-[#faf9f6] min-h-screen flex flex-col">
+        <AllergyModal language={language} isOpen={showAllergyModal} onClose={handleAllergyConfirm} onCancel={() => setShowAllergyModal(false)} />
 
-      <Header
-        language={language}
-        onLanguageChange={setLanguage}
-        onNavigate={handleNavigate}
-        onBookingStart={handleBookingStart}
-      />
+        {!location.pathname.startsWith('/admin') && (
+          <Header
+            language={language}
+            onLanguageChange={setLanguage}
+            onBookingStart={handleBookingStart}
+          />
+        )}
 
-      <main className="flex-grow">
-        {renderView()}
-      </main>
+        <main className="flex-grow">
+          <Routes>
+            <Route path="/" element={
+              <div className="scalable-content">
+                <HomePart1 language={language} onBookingStart={handleBookingStart} />
+                <HomePart2 language={language} onBookingStart={handleBookingStart} />
+                <HomePart3
+                  language={language}
+                  onBookingStart={handleBookingStart}
+                  onNavigateToEvent={(id) => navigate(id ? `/event/${id}` : '/event')}
+                  onBookingConfirmed={(data) => {
+                    setConfirmedBooking(data);
+                  }}
+                />
+              </div>
+            } />
+            <Route path="/event/:id" element={<EventDetail language={language} onBookingStart={handleBookingStart} />} />
+            <Route path="/event" element={<EventDetail language={language} onBookingStart={handleBookingStart} />} />
+            <Route path="/manage" element={<ManageReservation language={language} confirmedBooking={confirmedBooking} initialFlow="verify" />} />
+            <Route path="/admin" element={<AdminDashboard language={language} />} />
+            <Route path="/:slug" element={<DynamicPage language={language} />} />
+          </Routes>
+        </main>
 
-      <Footer language={language} onNavigate={handleNavigate} />
-    </div>
+        {!location.pathname.startsWith('/admin') && (
+          <Footer language={language} />
+        )}
+      </div>
+    </>
   );
 };
 

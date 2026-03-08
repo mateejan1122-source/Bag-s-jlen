@@ -1,70 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Language, translations } from '../translations';
-import { BookingData } from '../types';
+import { Language } from '../translations';
+import { LayoutDashboard, FileText, Type, Settings, LogOut, Menu, X, Trash2, Edit3, Plus, Globe, Coffee, Calendar, Image as ImageIcon, Users, Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+import { ReservationsTab } from './admin/ReservationsTab';
+import { MenuTab } from './admin/MenuTab';
+import { PagesTab } from './admin/PagesTab';
+import { ContentTab } from './admin/ContentTab';
+import { SettingsTab } from './admin/SettingsTab';
+import { EventsTab } from './admin/EventsTab';
+import { GalleryTab } from './admin/GalleryTab';
+import { MarketingTab } from './admin/MarketingTab';
+import { AppearanceTab } from './admin/AppearanceTab';
+
+type AdminTab = 'reservations' | 'menu' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'settings' | 'appearance';
 
 export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [userRole, setUserRole] = useState<'admin' | 'editor'>('admin');
     const [passcode, setPasscode] = useState('');
     const [error, setError] = useState('');
-    const [bookings, setBookings] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<AdminTab>('reservations');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const navigate = useNavigate();
+
+    // Data States
+    // No longer parsing pages/content inside the main dashboard component
+
+    // UI States
     const [loading, setLoading] = useState(false);
-    const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
 
-    const correctPasscode = '8410'; // A simple hardcoded passcode (maybe the zip code from the footer)
+    const correctPasscode = '8410';
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (passcode === correctPasscode) {
-            setIsAuthenticated(true);
-            setError('');
-            fetchBookings();
-        } else {
-            setError(language === 'da' ? 'Forkert adgangskode' : 'Incorrect passcode');
-            setPasscode('');
-        }
-    };
-
-    const fetchBookings = async () => {
         setLoading(true);
         try {
-            const { data, error: dbError } = await supabase
-                .from('bookings')
-                .select('*')
-                .order('date', { ascending: false })
-                .order('time', { ascending: true });
-
-            if (dbError) throw dbError;
-            setBookings(data || []);
+            if (passcode === correctPasscode) {
+                setUserRole('admin');
+                setIsAuthenticated(true);
+                setError('');
+                fetchData();
+            } else {
+                const { data, error } = await supabase.from('admin_users').select('*').eq('passcode', passcode).single();
+                if (error || !data) {
+                    setError(language === 'da' ? 'Forkert adgangskode' : 'Incorrect passcode');
+                    setPasscode('');
+                } else {
+                    setUserRole(data.role || 'editor');
+                    setIsAuthenticated(true);
+                    setError('');
+                    fetchData();
+                }
+            }
         } catch (err) {
-            console.error(err);
-            setError('Kunne ikke hente reservationer / Could not fetch reservations');
+            setError('Login failed');
         } finally {
             setLoading(false);
         }
     };
 
-    const updateStatus = async (id: string, newStatus: string) => {
-        try {
-            const { error: updateError } = await supabase
-                .from('bookings')
-                .update({ status: newStatus })
-                .eq('id', id);
-
-            if (updateError) throw updateError;
-
-            // Update local state without refetching all
-            setBookings(bookings.map(b => b.id === id ? { ...b, status: newStatus } : b));
-        } catch (err) {
-            console.error(err);
-            alert('Failed to update status');
-        }
+    const fetchData = () => {
+        // Main data fetch is now handled inside individual tabs
     };
 
     if (!isAuthenticated) {
         return (
-            <div className="bg-[#FAF9F6] min-h-[800px] py-32 px-8 flex flex-col items-center justify-center">
-                <div className="bg-white p-16 shadow-2xl border border-gray-100 max-w-lg w-full relative overflow-hidden text-center">
+            <div className="bg-[#FAF9F6] min-h-[800px] py-32 px-8 flex flex-col items-center justify-center -mt-[80px]">
+                <div className="bg-white p-16 shadow-2xl border border-gray-100 max-w-lg w-full relative overflow-hidden text-center z-10">
                     <div className="absolute top-0 left-0 w-full h-[4px] bg-[#CDA235]"></div>
                     <span className="text-[#CDA235] text-[10px] font-bold tracking-[0.4em] uppercase block mb-4">ADMINISTRATOR</span>
                     <h2 className="text-4xl serif italic text-[#1a1a1a] mb-12">Login</h2>
@@ -94,105 +98,125 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
         );
     }
 
-    const filteredBookings = bookings.filter(b => statusFilter === 'all' || b.status === statusFilter);
-
     return (
-        <div className="bg-[#FAF9F6] min-h-screen py-24 px-6 md:px-12 w-full">
-            <div className="max-w-7xl mx-auto">
-                <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-[#CDA235]/20 pb-8">
-                    <div>
-                        <span className="text-[#CDA235] text-[11px] font-bold tracking-[0.5em] uppercase block mb-2">OVERVIEW</span>
-                        <h1 className="text-5xl serif italic text-[#1a1a1a]">Reservations Dashboard</h1>
-                    </div>
-                    <div className="flex gap-4 mt-6 md:mt-0">
-                        {(['all', 'pending', 'confirmed', 'cancelled'] as const).map(filter => (
-                            <button
-                                key={filter}
-                                onClick={() => setStatusFilter(filter)}
-                                className={`text-[10px] font-bold uppercase tracking-[0.2em] px-4 py-2 transition-all ${statusFilter === filter ? 'bg-[#1a1a1a] text-white' : 'text-gray-400 hover:text-[#CDA235]'
-                                    }`}
-                            >
-                                {filter}
-                            </button>
-                        ))}
-                        <button onClick={fetchBookings} className="text-[#CDA235] hover:text-[#1a1a1a] ml-4 text-xl" title="Refresh">
-                            ↻
-                        </button>
-                    </div>
+        <div className="bg-[#FAF9F6] min-h-screen flex flex-col md:flex-row w-full font-sans">
+            {/* Sidebar Toggle for Mobile */}
+            <div className="md:hidden bg-[#1a1a1a] text-white p-4 flex justify-between items-center sticky top-0 z-20">
+                <span className="text-[#CDA235] text-[11px] font-bold tracking-[0.4em] uppercase">Control Panel</span>
+                <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+                    {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
+            </div>
+
+            {/* Sidebar */}
+            <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block w-full md:w-[280px] bg-[#1a1a1a] text-white flex-shrink-0 min-h-[calc(100vh-80px)] relative p-8 border-r border-[#CDA235]/20 z-10 transition-all`}>
+                <div className="mb-16 pb-8 border-b border-white/10">
+                    <span className="text-[#CDA235] text-[10px] font-bold tracking-[0.4em] uppercase block mb-3">ADMINISTRATOR</span>
+                    <h2 className="text-2xl serif italic text-white">Dashboard</h2>
                 </div>
 
-                {loading ? (
-                    <div className="text-center py-32 text-gray-400 text-[12px] uppercase tracking-[0.4em] font-bold">
-                        Indlæser reservationer...
-                    </div>
-                ) : (
-                    <div className="bg-white shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100 overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[900px]">
-                            <thead>
-                                <tr className="bg-[#faf9f6]">
-                                    <th className="py-6 px-8 text-[10px] font-bold text-[#CDA235] uppercase tracking-[0.3em] border-b border-gray-100">Date & Time</th>
-                                    <th className="py-6 px-8 text-[10px] font-bold text-[#CDA235] uppercase tracking-[0.3em] border-b border-gray-100">Guest</th>
-                                    <th className="py-6 px-8 text-[10px] font-bold text-[#CDA235] uppercase tracking-[0.3em] border-b border-gray-100">Contact</th>
-                                    <th className="py-6 px-8 text-[10px] font-bold text-[#CDA235] uppercase tracking-[0.3em] border-b border-gray-100 w-1/4">Notes</th>
-                                    <th className="py-6 px-8 text-[10px] font-bold text-[#CDA235] uppercase tracking-[0.3em] border-b border-gray-100 text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredBookings.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="py-16 text-center text-gray-400 text-[12px] uppercase tracking-[0.2em] font-bold italic">
-                                            Ingen reservationer fundet / No reservations found
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredBookings.map((booking) => (
-                                        <tr key={booking.id} className="border-b border-gray-50 hover:bg-[#faf9f6]/50 transition-colors group">
-                                            <td className="py-6 px-8">
-                                                <div className="font-bold text-[#1a1a1a] tracking-wider">{booking.date}</div>
-                                                <div className="text-gray-400 italic serif mt-1">{booking.time}</div>
-                                            </td>
-                                            <td className="py-6 px-8">
-                                                <div className="serif text-lg italic text-[#1a1a1a]">{booking.fullName}</div>
-                                                <div className="text-[10px] bg-gray-100 text-gray-500 inline-block px-2 py-1 mt-2 tracking-widest font-bold">
-                                                    {booking.guests} GÆSTER
-                                                </div>
-                                            </td>
-                                            <td className="py-6 px-8">
-                                                <div className="text-sm text-gray-600 mb-1">{booking.email}</div>
-                                                <div className="text-sm text-gray-500">{booking.phone}</div>
-                                            </td>
-                                            <td className="py-6 px-8">
-                                                <div className="text-sm text-gray-500 italic max-h-16 overflow-y-auto pr-2 custom-scrollbar">
-                                                    {booking.specialRequests || '-'}
-                                                </div>
-                                            </td>
-                                            <td className="py-6 px-8 flex justify-center mt-2 gap-2">
-                                                {booking.status === 'pending' ? (
-                                                    <>
-                                                        <button onClick={() => updateStatus(booking.id, 'confirmed')} className="w-8 h-8 flex items-center justify-center bg-[#CDA235]/10 text-[#CDA235] hover:bg-[#CDA235] hover:text-white transition-all rounded-full" title="Confirm">
-                                                            ✓
-                                                        </button>
-                                                        <button onClick={() => updateStatus(booking.id, 'cancelled')} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-full" title="Cancel">
-                                                            ✕
-                                                        </button>
-                                                    </>
-                                                ) : booking.status === 'confirmed' ? (
-                                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#CDA235] border border-[#CDA235]/30 px-3 py-1 bg-[#CDA235]/5">
-                                                        Confirmed
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-400 border border-red-100 px-3 py-1 bg-red-50">
-                                                        Cancelled
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                <nav className="space-y-2">
+                    <button
+                        onClick={() => { setActiveTab('reservations'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'reservations' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <LayoutDashboard size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Reservations</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('menu'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'menu' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <Coffee size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Menu</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('pages'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'pages' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <FileText size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Pages</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('content'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'content' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <Type size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Site Content</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('events'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'events' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <Calendar size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Events</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('gallery'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'gallery' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <ImageIcon size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Gallery</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('marketing'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'marketing' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <Users size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Marketing & Reviews</span>
+                    </button>
+
+                    {userRole === 'admin' && (
+                        <>
+                            <button
+                                onClick={() => { setActiveTab('appearance'); setIsSidebarOpen(false); }}
+                                className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'appearance' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                            >
+                                <Type size={18} />
+                                <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Appearance</span>
+                            </button>
+                            <button
+                                onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
+                                className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'settings' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                            >
+                                <Settings size={18} />
+                                <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Settings</span>
+                            </button>
+                        </>
+                    )}
+                </nav>
+
+                <div className="absolute bottom-8 left-8 right-8 space-y-4">
+                    <button onClick={() => navigate('/')} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-white transition-colors border border-white/10 hover:border-white/30">
+                        <Globe size={18} />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">View Site</span>
+                    </button>
+                    <button onClick={() => setIsAuthenticated(false)} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-red-400 transition-colors">
+                        <LogOut size={18} />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Log Out</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="flex-grow p-6 md:p-12 overflow-y-auto w-full bg-[#FAF9F6] relative z-0">
+                <div className="max-w-[1200px] mx-auto">
+                    {activeTab === 'reservations' && <ReservationsTab />}
+                    {activeTab === 'menu' && <MenuTab />}
+                    {activeTab === 'pages' && <PagesTab />}
+                    {activeTab === 'content' && <ContentTab />}
+                    {activeTab === 'events' && <EventsTab />}
+                    {activeTab === 'gallery' && <GalleryTab />}
+                    {activeTab === 'marketing' && <MarketingTab />}
+                    {activeTab === 'appearance' && userRole === 'admin' && <AppearanceTab />}
+                    {activeTab === 'settings' && userRole === 'admin' && <SettingsTab />}
+                </div>
             </div>
         </div>
     );

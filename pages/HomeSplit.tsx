@@ -11,10 +11,40 @@ interface HomePartProps {
 
 export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language }) => {
   const [isMuted, setIsMuted] = useState(true);
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
+
   const toggleMute = () => setIsMuted(!isMuted);
   const tHero = translations[language].hero;
   const tPhil = translations[language].philosophy;
   const tHist = translations[language].history;
+
+  React.useEffect(() => {
+    supabase.from('settings').select('*')
+      .then(({ data }) => {
+        if (data) {
+          setSettings(data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}));
+        }
+      });
+
+    supabase.from('reviews').select('*').eq('is_published', true).order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setReviews(data);
+        }
+      });
+  }, []);
+
+  // Timer to rotate active review
+  React.useEffect(() => {
+    if (reviews.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentReviewIndex((prev) => (prev + 1) % reviews.length);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [reviews]);
 
   return (
     <div className="flex flex-col bg-[#faf9f6] w-full">
@@ -30,9 +60,9 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language })
         </div>
 
         <div className="relative z-20 max-w-7xl px-4">
-          <div className="text-[12px] md:text-[14px] tracking-[0.6em] text-[#c5a059] uppercase font-bold mb-4 md:mb-6 drop-shadow-2xl">{tHero.welcome}</div>
-          <h1 className="text-[54px] md:text-[100px] lg:text-[140px] font-normal serif mb-4 md:mb-6 tracking-tighter leading-none text-white drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]">Bag Søjlen</h1>
-          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed">{tHero.sub}</p>
+          <div className="text-[12px] md:text-[14px] tracking-[0.6em] text-[#c5a059] uppercase font-bold mb-4 md:mb-6 drop-shadow-2xl">{settings.hero_welcome || tHero.welcome}</div>
+          <h1 className="text-[54px] md:text-[100px] lg:text-[140px] font-normal serif mb-4 md:mb-6 tracking-tighter leading-none text-white drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]">{settings.hero_title || 'Bag Søjlen'}</h1>
+          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed whitespace-pre-wrap">{settings.hero_subtitle || tHero.sub}</p>
 
           <div className="mb-10 md:mb-14 text-[10px] md:text-[11px] tracking-[0.3em] md:tracking-[0.4em] font-bold uppercase text-white/70 flex flex-wrap justify-center items-center gap-x-8 md:gap-x-12 gap-y-3">
             <span className="whitespace-nowrap">{language === 'da' ? 'Tir - Lør' : language === 'en' ? 'Tue - Sat' : 'Die - Sam'}: 17.00 - 22.00</span>
@@ -47,13 +77,13 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language })
               onClick={onBookingStart}
               className="bg-white text-black px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-[#c5a059] hover:text-white transition-all shadow-2xl w-full sm:w-auto"
             >
-              {tHero.book}
+              {settings.hero_btn_book || tHero.book}
             </button>
             <button
               onClick={() => document.getElementById('menu-section')?.scrollIntoView({ behavior: 'smooth' })}
               className="border-[2px] md:border-[3px] border-white/60 bg-white/5 backdrop-blur-md text-white px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-white hover:text-black transition-all w-full sm:w-auto"
             >
-              {tHero.seeMenu}
+              {settings.hero_btn_menu || tHero.seeMenu}
             </button>
           </div>
         </div>
@@ -88,7 +118,7 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language })
           <div className="h-[350px] md:h-[500px] lg:h-[700px] w-full relative overflow-hidden shadow-[20px_20px_40px_rgba(0,0,0,0.1)] md:shadow-[40px_40px_80px_rgba(0,0,0,0.1)] border-[6px] md:border-[10px] border-white z-10">
             <div
               className="absolute inset-0 img-cover transition-transform duration-[5000ms] group-hover:scale-105"
-              style={{ backgroundImage: 'url(https://i.pixi.mg/i/50fbc99187182fd3cbfa1416.png)' }}
+              style={{ backgroundImage: `url(${settings.philosophy_img || 'https://i.pixi.mg/i/50fbc99187182fd3cbfa1416.png'})` }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-tr from-[#CDA235]/10 via-transparent to-transparent opacity-60"></div>
           </div>
@@ -119,6 +149,63 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language })
         </div>
       </section>
 
+      {/* Quote Section */}
+      <section className="py-20 md:py-32 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
+        <div className="max-w-4xl mx-auto px-4 text-[#1a1a1a]">
+          <span className="text-4xl md:text-6xl serif text-[#CDA235]/10 block mb-6 md:mb-10 select-none opacity-50">“</span>
+
+          <div className="relative min-h-[140px] md:min-h-[100px] flex items-center justify-center">
+            {reviews.length > 0 ? (
+              <div key={currentReviewIndex} className="animate-in fade-in slide-in-from-right-4 duration-700 absolute w-full inset-0 flex flex-col items-center justify-center">
+                <div className="flex gap-1 mb-4 md:mb-6">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className={`text-sm md:text-base ${(reviews[currentReviewIndex].rating || 5) > i ? 'text-[#CDA235]' : 'text-gray-200'}`}>
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <h2 className="text-xl md:text-2xl lg:text-3xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
+                  "{reviews[currentReviewIndex].content}"
+                </h2>
+                <div className="flex flex-col items-center gap-3">
+                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{reviews[currentReviewIndex].author_name}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full flex flex-col items-center justify-center">
+                <div className="flex gap-1 mb-4 md:mb-6">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-sm md:text-base text-[#CDA235]">★</span>
+                  ))}
+                </div>
+                <h2 className="text-xl md:text-2xl lg:text-3xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
+                  {language === 'da' ? "En helt igennem fantastisk oplevelse. Maden var udsøgt, og atmosfæren var perfekt til vores jubilæum." : language === 'en' ? "A completely fantastic experience. The food was exquisite, and the atmosphere was perfect for our anniversary." : "Ein absolut fantastisches Erlebnis. Das Essen war exquisit und die Atmosphäre war perfekt für unser Jubiläum."}
+                </h2>
+                <div className="flex flex-col items-center gap-3">
+                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{language === 'da' ? "ANNE JENSEN" : "ANNA JOHNSON"}</span>
+                  <div className="w-8 h-px bg-gray-200"></div>
+                  <span className="text-[9px] text-gray-300 block font-bold tracking-[0.2em] uppercase">{language === 'da' ? "OKTOBER 2024" : "OCTOBER 2024"}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Carousel Indicators */}
+          {reviews.length > 1 && (
+            <div className="flex justify-center gap-2 mt-20">
+              {reviews.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentReviewIndex(i)}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${i === currentReviewIndex ? 'bg-[#CDA235] w-6' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* History Section */}
       <section id="history-section" className="px-6 md:px-20 py-0 grid lg:grid-cols-2 gap-0 items-stretch max-w-[1440px] mx-auto w-full pb-20 md:pb-32">
         <div className="p-8 md:p-14 lg:p-20 xl:p-24 z-20 relative bg-white border border-[#f2f1ed] shadow-[20px_20px_40px_rgba(0,0,0,0.02)] flex flex-col justify-center text-left">
@@ -141,8 +228,13 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language })
   );
 };
 
-const MenuItem: React.FC<{ name: string; price: string | number; desc?: string }> = ({ name, price, desc }) => (
-  <div className="flex justify-between items-start border-b border-[#CDA235]/10 pb-4 md:pb-6 mb-4 md:mb-6 group">
+const MenuItem: React.FC<{ name: string; price: string | number; desc?: string; imageUrl?: string; onClick?: () => void }> = ({ name, price, desc, imageUrl, onClick }) => (
+  <div onClick={onClick} className={`flex justify-between items-start border-b border-[#CDA235]/10 pb-4 md:pb-6 mb-4 md:mb-6 group ${onClick ? 'cursor-pointer' : ''}`}>
+    {imageUrl && (
+      <div className="w-16 h-16 md:w-20 md:h-20 flex-shrink-0 mr-4 md:mr-6 overflow-hidden bg-gray-50 border border-gray-100 hidden sm:block">
+        <img src={imageUrl} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      </div>
+    )}
     <div className="flex-1 pr-4">
       <h4 className="text-xl md:text-2xl serif text-[#1a1a1a] group-hover:text-[#CDA235] transition-colors">{name}</h4>
       {desc && <p className="text-[12px] md:text-[14px] text-gray-400 font-light mt-1 italic leading-snug">{desc}</p>}
@@ -155,11 +247,54 @@ const MenuItem: React.FC<{ name: string; price: string | number; desc?: string }
 
 export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language }) => {
   const [activeTab, setActiveTab] = useState<'alacarte' | 'takeaway' | 'frokost' | 'kids'>('alacarte');
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [selectedDish, setSelectedDish] = useState<any | null>(null);
   const tMenu = translations[language].menu;
   const tSeas = translations[language].seasonal;
 
+  React.useEffect(() => {
+    supabase.from('menu_items').select('*').eq('is_visible', true).order('display_order', { ascending: true })
+      .then(({ data }) => setMenuItems(data || []));
+
+    supabase.from('settings').select('*')
+      .then(({ data }) => {
+        if (data) {
+          setSettings(data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}));
+        }
+      });
+  }, []);
+
+  const getItems = (catStr: string) => menuItems.filter(item => item.category?.toLowerCase().includes(catStr));
+
   return (
     <div className="flex flex-col bg-[#faf9f6] w-full">
+      {selectedDish && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={() => setSelectedDish(null)}>
+          <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+            {selectedDish.image_url && (
+              <div className="w-full aspect-video bg-gray-100 flex-shrink-0 relative">
+                <img src={selectedDish.image_url} alt={selectedDish.name} className="w-full h-full object-cover" />
+                <button onClick={() => setSelectedDish(null)} className="absolute top-4 right-4 w-10 h-10 bg-black/50 hover:bg-black text-white rounded-full flex items-center justify-center transition-colors">
+                  ✕
+                </button>
+              </div>
+            )}
+            <div className="p-8 md:p-12 text-center relative">
+              {!selectedDish.image_url && (
+                <button onClick={() => setSelectedDish(null)} className="absolute top-4 right-4 w-10 h-10 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full flex items-center justify-center transition-colors">
+                  ✕
+                </button>
+              )}
+              <h3 className="text-3xl md:text-4xl serif text-[#1a1a1a] mb-4">{selectedDish.name}</h3>
+              <p className="text-xl md:text-2xl font-bold text-[#CDA235] mb-6">{selectedDish.price}</p>
+              <div className="w-16 h-0.5 bg-[#CDA235]/30 mx-auto mb-6"></div>
+              <p className="text-gray-500 italic leading-loose text-sm md:text-base">{selectedDish.description}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Menukort Section */}
       <section id="menu-section" className="px-6 md:px-20 pb-20 md:pb-32 pt-16 md:pt-24 text-center max-w-[1440px] mx-auto w-full">
         <h2 className="text-[60px] md:text-[100px] serif mb-8 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none">{tMenu.title}</h2>
@@ -193,22 +328,40 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-16 text-left animate-in fade-in duration-500">
               <div>
                 <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.starters}</h3>
-                <MenuItem name={tMenu.items.soup} price="98,-" desc={tMenu.items.soupDesc} />
-                <MenuItem name={tMenu.items.prawns} price="128,-" desc={tMenu.items.prawnsDesc} />
-                <MenuItem name={tMenu.items.carpaccio} price="138,-" desc={tMenu.items.carpaccioDesc} />
+                {getItems('starters').length > 0 ? getItems('starters').map(item => (
+                  <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                )) : (
+                  <>
+                    <MenuItem name={tMenu.items.soup} price="98,-" desc={tMenu.items.soupDesc} />
+                    <MenuItem name={tMenu.items.prawns} price="128,-" desc={tMenu.items.prawnsDesc} />
+                    <MenuItem name={tMenu.items.carpaccio} price="138,-" desc={tMenu.items.carpaccioDesc} />
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.main}</h3>
-                <MenuItem name={tMenu.items.fish} price="238,-" desc={tMenu.items.fishDesc} />
-                <MenuItem name={tMenu.items.schnitzel} price="268,-" desc={tMenu.items.schnitzelDesc} />
-                <MenuItem name={tMenu.items.duck} price="268,-" desc={tMenu.items.duckDesc} />
-                <MenuItem name={tMenu.items.steak} price="378,-" desc={tMenu.items.steakDesc} />
+                {getItems('mains').length > 0 ? getItems('mains').map(item => (
+                  <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                )) : (
+                  <>
+                    <MenuItem name={tMenu.items.fish} price="238,-" desc={tMenu.items.fishDesc} />
+                    <MenuItem name={tMenu.items.schnitzel} price="268,-" desc={tMenu.items.schnitzelDesc} />
+                    <MenuItem name={tMenu.items.duck} price="268,-" desc={tMenu.items.duckDesc} />
+                    <MenuItem name={tMenu.items.steak} price="378,-" desc={tMenu.items.steakDesc} />
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.dessert}</h3>
-                <MenuItem name={tMenu.items.tart} price="98,-" desc={tMenu.items.tartDesc} />
-                <MenuItem name={tMenu.items.cake} price="98,-" desc={tMenu.items.cakeDesc} />
-                <MenuItem name={tMenu.items.brulee} price="98,-" desc={tMenu.items.bruleeDesc} />
+                {getItems('dessert').length > 0 ? getItems('dessert').map(item => (
+                  <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                )) : (
+                  <>
+                    <MenuItem name={tMenu.items.tart} price="98,-" desc={tMenu.items.tartDesc} />
+                    <MenuItem name={tMenu.items.cake} price="98,-" desc={tMenu.items.cakeDesc} />
+                    <MenuItem name={tMenu.items.brulee} price="98,-" desc={tMenu.items.bruleeDesc} />
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -218,44 +371,64 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
                 <h3 className="text-2xl md:text-3xl serif text-[#1a1a1a] mb-2">T A K E A W A Y</h3>
                 <p className="text-[#CDA235] font-bold tracking-[0.3em]">{tMenu.takeaway.phone}</p>
               </div>
-              <div className="space-y-2">
-                <div className="flex flex-col mb-8">
-                  <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'TIRSDAG' : 'TUESDAY'}</span>
-                  <MenuItem name={tMenu.takeaway.tirsdag} price={tMenu.takeaway.tirsdagPrice} desc={tMenu.takeaway.tirsdagDesc} />
-                </div>
-                <div className="flex flex-col mb-8">
-                  <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'ONSDAG' : 'WEDNESDAY'}</span>
-                  <MenuItem name={tMenu.takeaway.onsdag} price={tMenu.takeaway.onsdagPrice} desc={tMenu.takeaway.onsdagDesc} />
-                </div>
-                <div className="flex flex-col mb-8">
-                  <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'TORSDAG' : 'THURSDAY'}</span>
-                  <MenuItem name={tMenu.takeaway.torsdag} price={tMenu.takeaway.torsdagPrice} desc={tMenu.takeaway.torsdagDesc} />
-                </div>
-                <div className="flex flex-col mb-8">
-                  <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'FREDAG' : 'FRIDAY'}</span>
-                  <MenuItem name={tMenu.takeaway.fredag} price={tMenu.takeaway.fredagPrice} desc={tMenu.takeaway.fredagDesc} />
-                </div>
-                <div className="flex flex-col mb-8">
-                  <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'LØRDAG' : 'SATURDAY'}</span>
-                  <MenuItem name={tMenu.takeaway.loerdag} price={tMenu.takeaway.loerdagPrice} desc={tMenu.takeaway.loerdagDesc} />
-                </div>
+              <div className="space-y-4">
+                {getItems('takeaway').length > 0 ? (
+                  ['mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag', 'søndag', ''].map(day => {
+                    const dayItems = getItems('takeaway').filter(item => (item.day || '') === day);
+                    if (dayItems.length === 0) return null;
+                    const dayNames: Record<string, { da: string, en: string }> = {
+                      mandag: { da: 'MANDAG', en: 'MONDAY' },
+                      tirsdag: { da: 'TIRSDAG', en: 'TUESDAY' },
+                      onsdag: { da: 'ONSDAG', en: 'WEDNESDAY' },
+                      torsdag: { da: 'TORSDAG', en: 'THURSDAY' },
+                      fredag: { da: 'FREDAG', en: 'FRIDAY' },
+                      lørdag: { da: 'LØRDAG', en: 'SATURDAY' },
+                      søndag: { da: 'SØNDAG', en: 'SUNDAY' },
+                      '': { da: 'ALTID TILGÆNGELIG', en: 'ALWAYS AVAILABLE' },
+                    };
+                    return (
+                      <div key={day} className="mb-8">
+                        {day && <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-4 block uppercase border-b border-[#CDA235]/20 pb-2 inline-block">{language === 'da' ? dayNames[day].da : dayNames[day].en}</span>}
+                        {!day && <span className="text-[10px] font-bold text-gray-400 tracking-[0.4em] mb-4 block uppercase border-b border-gray-200 pb-2 inline-block">{language === 'da' ? dayNames[day].da : dayNames[day].en}</span>}
+                        {dayItems.map(item => (
+                          <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                        ))}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'TIRSDAG' : 'TUESDAY'}</span>
+                    <MenuItem name={tMenu.takeaway.tirsdag} price={tMenu.takeaway.tirsdagPrice} desc={tMenu.takeaway.tirsdagDesc} />
+                    <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'ONSDAG' : 'WEDNESDAY'}</span>
+                    <MenuItem name={tMenu.takeaway.onsdag} price={tMenu.takeaway.onsdagPrice} desc={tMenu.takeaway.onsdagDesc} />
+                  </>
+                )}
               </div>
             </div>
           )}
           {activeTab === 'frokost' && (
             <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
               <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.tabs.frokost}</h3>
-              {tMenu.frokostItems.map((item: any, i: number) => (
-                <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
-              ))}
+              {getItems('frokost').length > 0 ? getItems('frokost').map(item => (
+                <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+              )) : (
+                tMenu.frokostItems.map((item: any, i: number) => (
+                  <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
+                ))
+              )}
             </div>
           )}
           {activeTab === 'kids' && (
             <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
               <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.tabs.kids}</h3>
-              {tMenu.kidsItems.map((item: any, i: number) => (
-                <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
-              ))}
+              {getItems('kids').length > 0 ? getItems('kids').map(item => (
+                <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+              )) : (
+                tMenu.kidsItems.map((item: any, i: number) => (
+                  <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
+                ))
+              )}
             </div>
           )}
         </div>
@@ -274,7 +447,7 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
             <div className="lg:col-span-2 relative overflow-hidden min-h-[300px] md:min-h-[450px] lg:min-h-0 bg-[#1a1a1a]">
               <div
                 className="absolute inset-0 img-cover transition-transform duration-[6000ms] group-hover:scale-110"
-                style={{ backgroundImage: 'url(https://i.pixi.mg/i/74e094099766914f4b302a3c.jpg)' }}
+                style={{ backgroundImage: `url(${settings.seasonal_img || 'https://i.pixi.mg/i/74e094099766914f4b302a3c.jpg'})` }}
               ></div>
               <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors duration-700"></div>
             </div>
@@ -328,6 +501,17 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
   const tBook = translations[language].booking;
   const tFlow = translations[language].flow;
   const tConf = translations[language].confirmation;
+
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    supabase.from('reviews').select('*').eq('is_published', true).order('rating', { ascending: false }).limit(3)
+      .then(({ data }) => setReviews(data || []));
+
+    supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(3)
+      .then(({ data }) => setEvents(data || []));
+  }, []);
 
   const [bookingStep, setBookingStep] = useState<'initial' | 'time' | 'details' | 'success'>('initial');
   const [bookingData, setBookingData] = useState<BookingData>({
@@ -470,8 +654,8 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                       key={time}
                       onClick={() => setBookingData({ ...bookingData, time })}
                       className={`py-6 px-4 border-2 transition-all duration-400 flex flex-col items-center gap-1 ${time === bookingData.time
-                          ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xl scale-[1.02]'
-                          : 'bg-white border-gray-50 text-[#1a1a1a] hover:border-[#CDA235]'
+                        ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xl scale-[1.02]'
+                        : 'bg-white border-gray-50 text-[#1a1a1a] hover:border-[#CDA235]'
                         }`}
                     >
                       <span className="text-xl serif font-medium italic">{time}</span>
@@ -715,21 +899,6 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
         </div>
       </section>
 
-      {/* Quote Section */}
-      <section className="py-20 md:py-32 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full">
-        <div className="max-w-6xl mx-auto px-4 text-[#1a1a1a]">
-          <span className="text-5xl md:text-7xl serif text-[#CDA235]/10 block mb-8 md:mb-12 select-none opacity-50">“</span>
-          <h2 className="text-2xl md:text-4xl lg:text-5xl serif italic font-light leading-tight mb-10 md:mb-16 px-0 lg:px-10 tracking-tight">
-            {language === 'da' ? "En helt igennem fantastisk oplevelse. Maden var udsøgt, og atmosfæren var perfekt til vores jubilæum." : language === 'en' ? "A completely fantastic experience. The food was exquisite, and the atmosphere was perfect for our anniversary." : "Ein absolut fantastisches Erlebnis. Das Essen war exquisit und die Atmosphäre war perfekt für unser Jubiläum."}
-          </h2>
-          <div className="flex flex-col items-center gap-4">
-            <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{language === 'da' ? "ANNE JENSEN" : "ANNA JOHNSON"}</span>
-            <div className="w-10 h-px bg-gray-200"></div>
-            <span className="text-[10px] text-gray-300 block font-bold tracking-[0.2em] uppercase">{language === 'da' ? "OKTOBER 2024" : "OCTOBER 2024"}</span>
-          </div>
-        </div>
-      </section>
-
       {/* News Section */}
       <section className="px-6 md:px-20 py-20 md:py-32 max-w-[1440px] mx-auto w-full bg-white text-left">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-20 gap-8">
@@ -741,27 +910,45 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-16">
-          {[
-            { date: "6. MARTS 2026", title: tNews.eventTitle, desc: tNews.eventDesc, img: "https://i.pixi.mg/i/6ce47e10d2138e072bc6c21f.png", isSpecial: true },
-          ].map((article, i) => (
+          {events.length > 0 ? events.map((event, i) => (
             <div
-              key={i}
-              onClick={() => article.isSpecial && onNavigateToEvent?.()}
+              key={event.id}
+              onClick={() => onNavigateToEvent?.(event.id)}
               className="group cursor-pointer w-full"
             >
               <div
-                className={`aspect-[16/11] w-full mb-6 md:mb-10 shadow-inner overflow-hidden border border-gray-100 img-cover grayscale-[0.2] brightness-90 hover:grayscale-0 hover:brightness-100 transition-all duration-700 ${article.isSpecial ? 'border-[#CDA235]/30' : ''}`}
-                style={{ backgroundImage: `url(${article.img})` }}
+                className={`aspect-[16/11] w-full mb-6 md:mb-10 shadow-inner overflow-hidden border border-gray-100 img-cover grayscale-[0.2] brightness-90 hover:grayscale-0 hover:brightness-100 transition-all duration-700 border-[#CDA235]/30`}
+                style={{ backgroundImage: `url(${event.image_url || 'https://i.pixi.mg/i/6ce47e10d2138e072bc6c21f.png'})` }}
               >
-                {article.isSpecial && (
-                  <div className="absolute top-4 right-4 bg-[#CDA235] text-white px-4 py-2 text-[9px] font-bold uppercase tracking-[0.2em]">{tNews.eventTag}</div>
-                )}
+                <div className="absolute top-4 right-4 bg-[#CDA235] text-white px-4 py-2 text-[9px] font-bold uppercase tracking-[0.2em]">{tNews.eventTag}</div>
               </div>
-              <span className="text-[9px] md:text-[10px] font-bold text-[#CDA235] tracking-[0.2em] block mb-4 uppercase">{article.date}</span>
-              <h3 className="text-xl md:text-2xl serif mb-4 group-hover:underline underline-offset-8 transition-all leading-tight text-[#1a1a1a]">{article.title}</h3>
-              <p className="text-[13px] text-gray-500 font-light leading-relaxed">{article.desc}</p>
+              <span className="text-[9px] md:text-[10px] font-bold text-[#CDA235] tracking-[0.2em] block mb-4 uppercase">{event.start_date ? new Date(event.start_date).toLocaleDateString() : ''}</span>
+              <h3 className="text-xl md:text-2xl serif mb-4 group-hover:underline underline-offset-8 transition-all leading-tight text-[#1a1a1a]">{event.title}</h3>
+              <p className="text-[13px] text-gray-500 font-light leading-relaxed">{event.description}</p>
             </div>
-          ))}
+          )) : (
+            [
+              { date: "6. MARTS 2026", title: tNews.eventTitle, desc: tNews.eventDesc, img: "https://i.pixi.mg/i/6ce47e10d2138e072bc6c21f.png", isSpecial: true },
+            ].map((article, i) => (
+              <div
+                key={i}
+                onClick={() => article.isSpecial && onNavigateToEvent?.()}
+                className="group cursor-pointer w-full"
+              >
+                <div
+                  className={`aspect-[16/11] w-full mb-6 md:mb-10 shadow-inner overflow-hidden border border-gray-100 img-cover grayscale-[0.2] brightness-90 hover:grayscale-0 hover:brightness-100 transition-all duration-700 ${article.isSpecial ? 'border-[#CDA235]/30' : ''}`}
+                  style={{ backgroundImage: `url(${article.img})` }}
+                >
+                  {article.isSpecial && (
+                    <div className="absolute top-4 right-4 bg-[#CDA235] text-white px-4 py-2 text-[9px] font-bold uppercase tracking-[0.2em]">{tNews.eventTag}</div>
+                  )}
+                </div>
+                <span className="text-[9px] md:text-[10px] font-bold text-[#CDA235] tracking-[0.2em] block mb-4 uppercase">{article.date}</span>
+                <h3 className="text-xl md:text-2xl serif mb-4 group-hover:underline underline-offset-8 transition-all leading-tight text-[#1a1a1a]">{article.title}</h3>
+                <p className="text-[13px] text-gray-500 font-light leading-relaxed">{article.desc}</p>
+              </div>
+            ))
+          )}
         </div>
       </section>
 
