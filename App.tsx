@@ -121,7 +121,11 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={
               <div className="scalable-content">
-                <HomePart1 language={language} onBookingStart={handleBookingStart} />
+                <HomePart1
+                  language={language}
+                  onBookingStart={handleBookingStart}
+                  onNavigateToEvent={(id) => navigate(id ? `/event/${id}` : '/event')}
+                />
                 <HomePart2 language={language} onBookingStart={handleBookingStart} />
                 <HomePart3
                   language={language}

@@ -5,15 +5,16 @@ import { supabase } from '../lib/supabase';
 
 interface HomePartProps {
   onBookingStart?: () => void;
-  onNavigateToEvent?: () => void;
+  onNavigateToEvent?: (id?: string) => void;
   language: Language;
 }
 
-export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language }) => {
+export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateToEvent, language }) => {
   const [isMuted, setIsMuted] = useState(true);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [reviews, setReviews] = useState<any[]>([]);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
+  const [featuredEvent, setFeaturedEvent] = useState<any | null>(null);
 
   const toggleMute = () => setIsMuted(!isMuted);
   const tHero = translations[language].hero;
@@ -32,6 +33,32 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language })
       .then(({ data }) => {
         if (data && data.length > 0) {
           setReviews(data);
+        }
+      });
+
+    // Fetch the featured event
+    const fetchNextUpcomingEvent = () => {
+      supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(1)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setFeaturedEvent(data[0]);
+          }
+        });
+    };
+
+    supabase.from('settings').select('*').eq('key', 'featured_event_id').maybeSingle()
+      .then(({ data: settingsData }) => {
+        if (settingsData && settingsData.value) {
+          supabase.from('events').select('*').eq('id', settingsData.value).single()
+            .then(({ data: eventData }) => {
+              if (eventData) {
+                setFeaturedEvent(eventData);
+              } else {
+                fetchNextUpcomingEvent();
+              }
+            });
+        } else {
+          fetchNextUpcomingEvent();
         }
       });
   }, []);
@@ -206,20 +233,43 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, language })
         </div>
       </section>
 
-      {/* History Section */}
+      {/* Featured Event / History Section */}
       <section id="history-section" className="px-6 md:px-20 py-0 grid lg:grid-cols-2 gap-0 items-stretch max-w-[1440px] mx-auto w-full pb-20 md:pb-32">
         <div className="p-8 md:p-14 lg:p-20 xl:p-24 z-20 relative bg-white border border-[#f2f1ed] shadow-[20px_20px_40px_rgba(0,0,0,0.02)] flex flex-col justify-center text-left">
-          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-8">{tHist.tag}</span>
-          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none">{tHist.title}</h2>
-          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl">
-            <p>{tHist.text1}</p>
-            <button className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start">{tHist.readMore}</button>
+          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-8">
+            {featuredEvent ? (featuredEvent.details?.top_tag || (language === 'da' ? 'BEGIVENHED' : 'FEATURED EVENT')) : tHist.tag}
+          </span>
+          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none">
+            {featuredEvent ? featuredEvent.title : tHist.title}
+          </h2>
+          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl pointer-events-auto">
+            <p>{featuredEvent ? (featuredEvent.description || featuredEvent.details?.paragraph_1) : tHist.text1}</p>
+            {featuredEvent ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateToEvent) {
+                    onNavigateToEvent(featuredEvent.id);
+                  }
+                }}
+                className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start cursor-pointer"
+              >
+                {language === 'da' ? 'LÆS MERE' : 'READ MORE'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start"
+              >
+                {tHist.readMore}
+              </button>
+            )}
           </div>
         </div>
         <div className="relative group overflow-hidden z-10 shadow-[20px_20px_40px_rgba(0,0,0,0.1)] min-h-[350px] md:min-h-[500px] lg:min-h-[700px]">
           <div
             className="absolute inset-0 img-cover grayscale-[0.2] brightness-75 transition-all hover:grayscale-0 hover:brightness-100 duration-1000 group-hover:scale-105"
-            style={{ backgroundImage: 'url(https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg)' }}
+            style={{ backgroundImage: `url(${featuredEvent ? (featuredEvent.image_url || 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg') : 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg'})` }}
           ></div>
           <div className="absolute inset-0 bg-gradient-to-l from-black/20 via-transparent to-transparent pointer-events-none"></div>
         </div>

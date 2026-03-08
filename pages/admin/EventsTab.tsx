@@ -5,6 +5,7 @@ import { Plus, Edit3, Trash2, Calendar, Image as ImageIcon } from 'lucide-react'
 export const EventsTab: React.FC = () => {
     const [events, setEvents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [featuredEventId, setFeaturedEventId] = useState<string | null>(null);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editingItem, setEditingItem] = useState({
@@ -45,15 +46,51 @@ export const EventsTab: React.FC = () => {
     const fetchEvents = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data: eventsData, error: eventsError } = await supabase
                 .from('events')
                 .select('*')
                 .order('start_date', { ascending: true });
 
-            if (error) throw error;
-            setEvents(data || []);
+            if (eventsError) throw eventsError;
+            setEvents(eventsData || []);
+
+            const { data: settingsData, error: settingsError } = await supabase
+                .from('settings')
+                .select('*')
+                .eq('key', 'featured_event_id')
+                .maybeSingle();
+
+            if (!settingsError && settingsData) {
+                setFeaturedEventId(settingsData.value);
+            }
         } catch (err) {
             console.error('Error fetching events:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSetFeatured = async (id: string, title: string) => {
+        setLoading(true);
+        try {
+            const { data: existing } = await supabase.from('settings').select('id').eq('key', 'featured_event_id').maybeSingle();
+
+            let queryError;
+            if (existing) {
+                const { error } = await supabase.from('settings').update({ value: id }).eq('key', 'featured_event_id');
+                queryError = error;
+            } else {
+                const { error } = await supabase.from('settings').insert({ key: 'featured_event_id', value: id, category: 'general' });
+                queryError = error;
+            }
+
+            if (queryError) throw queryError;
+
+            setFeaturedEventId(id);
+            alert(`"${title}" is now the featured event on the homepage.`);
+        } catch (err: any) {
+            console.error('Error setting featured event:', err);
+            alert(`Failed to set featured event: ${err.message || 'Unknown database error'}`);
         } finally {
             setLoading(false);
         }
@@ -312,6 +349,9 @@ export const EventsTab: React.FC = () => {
                                     {!event.is_published && <div className="absolute top-4 right-4 bg-orange-500 text-white text-[9px] font-bold uppercase tracking-widest px-3 py-1">Draft</div>}
                                 </div>
                             )}
+                            {featuredEventId === event.id && (
+                                <div className="absolute top-4 left-4 bg-[#CDA235] text-white text-[9px] font-bold uppercase tracking-widest px-3 py-1 shadow-md z-10">Featured</div>
+                            )}
 
                             <div className="p-6 flex-1 flex flex-col">
                                 <h3 className="text-2xl serif italic text-[#1a1a1a] mb-2">{event.title}</h3>
@@ -324,7 +364,12 @@ export const EventsTab: React.FC = () => {
                                 )}
                                 <p className="text-gray-600 text-sm line-clamp-3 mb-6 flex-1">{event.description}</p>
 
-                                <div className="flex gap-2 justify-end border-t border-gray-50 pt-4 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex gap-2 justify-end border-t border-gray-50 pt-4 md:opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
+                                    {featuredEventId !== event.id && event.is_published && (
+                                        <button onClick={() => handleSetFeatured(event.id, event.title)} className="text-[10px] uppercase font-bold tracking-widest flex items-center gap-1 text-green-600 hover:text-green-800 px-3 py-2 bg-green-50 transition-colors w-full sm:w-auto text-center justify-center mb-2 sm:mb-0">
+                                            🌟 Set Featured
+                                        </button>
+                                    )}
                                     <button onClick={() => {
                                         setEditingItem({
                                             ...event,
@@ -343,10 +388,10 @@ export const EventsTab: React.FC = () => {
                                             }
                                         });
                                         setIsEditing(true);
-                                    }} className="text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 text-blue-500 hover:text-blue-700 px-3 py-2 bg-blue-50 transition-colors">
+                                    }} className="flex-1 sm:flex-none text-[10px] uppercase font-bold tracking-widest flex justify-center items-center gap-2 text-blue-500 hover:text-blue-700 px-3 py-2 bg-blue-50 transition-colors">
                                         <Edit3 size={14} /> Edit
                                     </button>
-                                    <button onClick={() => handleDelete(event.id, event.title)} className="text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 text-red-500 hover:text-red-700 px-3 py-2 bg-red-50 transition-colors">
+                                    <button onClick={() => handleDelete(event.id, event.title)} className="flex-1 sm:flex-none text-[10px] uppercase font-bold tracking-widest flex justify-center items-center gap-2 text-red-500 hover:text-red-700 px-3 py-2 bg-red-50 transition-colors">
                                         <Trash2 size={14} /> Delete
                                     </button>
                                 </div>
