@@ -88,11 +88,21 @@ export const ContentTab: React.FC = () => {
                     hasText = true;
                     for (const targetLang of targetLangs) {
                         const targetKey = targetLang === 'da' ? key : `${key}_${targetLang}`;
-                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=${sourceLang}|${targetLang}`);
-                        const data = await res.json();
+                        const deepLTarget = targetLang === 'en' ? 'EN-GB' : targetLang.toUpperCase();
+                        const { data, error } = await supabase.functions.invoke('translate', {
+                            body: {
+                                text: [textToTranslate],
+                                target_lang: deepLTarget
+                            }
+                        });
                         
-                        if (data?.responseData?.translatedText) {
-                            newSettings[targetKey] = data.responseData.translatedText;
+                        if (error) {
+                            console.error('DeepL Translation API Error:', error);
+                            continue;
+                        }
+                        
+                        if (data?.translations?.[0]?.text) {
+                            newSettings[targetKey] = data.translations[0].text;
                         }
                     }
                 }

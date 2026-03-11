@@ -88,10 +88,21 @@ export const EventsTab: React.FC = () => {
                     
                     if (text && text.trim()) {
                         hasText = true;
-                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
-                        const data = await res.json();
-                        if (data?.responseData?.translatedText) {
-                            (newItem as any)[targetKey] = data.responseData.translatedText;
+                        const deepLTarget = targetLang === 'en' ? 'EN-GB' : targetLang.toUpperCase();
+                        const { data, error } = await supabase.functions.invoke('translate', {
+                            body: {
+                                text: [text],
+                                target_lang: deepLTarget
+                            }
+                        });
+                        
+                        if (error) {
+                            console.error('DeepL Translation API Error:', error);
+                            continue;
+                        }
+                        
+                        if (data?.translations?.[0]?.text) {
+                            (newItem as any)[targetKey] = data.translations[0].text;
                         }
                     }
                 }
@@ -107,10 +118,21 @@ export const EventsTab: React.FC = () => {
                     const text = sourceDetails[dField];
                     if (text && text.trim()) {
                         hasText = true;
-                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
-                        const data = await res.json();
-                        if (data?.responseData?.translatedText) {
-                            targetDetails[dField] = data.responseData.translatedText;
+                        const deepLTarget = targetLang === 'en' ? 'EN-GB' : targetLang.toUpperCase();
+                        const { data, error } = await supabase.functions.invoke('translate', {
+                            body: {
+                                text: [text],
+                                target_lang: deepLTarget
+                            }
+                        });
+                        
+                        if (error) {
+                            console.error('DeepL Translation API Error:', error);
+                            continue;
+                        }
+                        
+                        if (data?.translations?.[0]?.text) {
+                            targetDetails[dField] = data.translations[0].text;
                         }
                     }
                 }
