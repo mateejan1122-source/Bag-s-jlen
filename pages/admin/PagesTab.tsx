@@ -51,10 +51,21 @@ export const PagesTab: React.FC = () => {
                     // Simple HTML preservation attempt for content translation (the API mostly handles tags OK)
                     if (text && text.trim()) {
                         hasText = true;
-                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
-                        const data = await res.json();
-                        if (data?.responseData?.translatedText) {
-                            (newDetails as any)[targetKey] = data.responseData.translatedText;
+                        const deepLTarget = targetLang === 'en' ? 'EN-GB' : targetLang.toUpperCase();
+                        const { data, error } = await supabase.functions.invoke('translate', {
+                            body: {
+                                text: [text],
+                                target_lang: deepLTarget
+                            }
+                        });
+                        
+                        if (error) {
+                            console.error('DeepL Translation API Error:', error);
+                            continue;
+                        }
+                        
+                        if (data?.translations?.[0]?.text) {
+                            (newDetails as any)[targetKey] = data.translations[0].text;
                         }
                     }
                 }

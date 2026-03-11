@@ -46,24 +46,42 @@ export const EventDetail: React.FC<EventDetailProps> = ({ onBookingStart, langua
 
   if (loading) return <div className="min-h-screen bg-[#faf9f6] flex items-center justify-center">Loading...</div>;
 
-  const details = eventData?.details || {};
-  const displayTitle = eventData?.title || tNews.eventTitle;
-  const displayImage = eventData?.image_url || "https://i.pixi.mg/i/6ce47e10d2138e072bc6c21f.png";
-  const displayDate = details.hero_date || (eventData?.start_date ? new Date(eventData.start_date).toLocaleDateString() : t.eventHeroDate);
-  const displayDesc1 = details.paragraph_1 || eventData?.description || t.p1;
-  const displayDesc2 = details.paragraph_2 || (!eventData ? t.p2 : '');
-  const topTag = details.top_tag || tNews.eventTag;
-  const infoTitle = details.info_title || (!eventData ? t.infoTitle : '');
+  const getTranslatedText = (baseObj: any, key: string, language: Language, fallbackTag: string) => {
+    if (!baseObj) return fallbackTag;
+    if (language === 'en' && baseObj[`${key}_en`]) return baseObj[`${key}_en`];
+    if (language === 'de' && baseObj[`${key}_de`]) return baseObj[`${key}_de`];
+    return baseObj[key] || fallbackTag;
+  };
 
-  const bullets = details.bullet_points
-    ? details.bullet_points.split('\n').filter((b: string) => b.trim() !== '')
+  const details = eventData?.details || {};
+  const detailsEn = eventData?.details_en || {};
+  const detailsDe = eventData?.details_de || {};
+
+  const getTranslatedDetail = (key: string, language: Language, fallbackData: string) => {
+    if (!eventData) return fallbackData;
+    if (language === 'en' && detailsEn[key]) return detailsEn[key];
+    if (language === 'de' && detailsDe[key]) return detailsDe[key];
+    return details[key] || fallbackData;
+  };
+
+  const displayTitle = getTranslatedText(eventData, 'title', language, tNews.eventTitle);
+  const displayImage = eventData?.image_url || "https://i.pixi.mg/i/6ce47e10d2138e072bc6c21f.png";
+  const displayDate = getTranslatedDetail('hero_date', language, eventData?.start_date ? new Date(eventData.start_date).toLocaleDateString() : t.eventHeroDate);
+  const displayDesc1 = getTranslatedDetail('paragraph_1', language, getTranslatedText(eventData, 'description', language, t.p1));
+  const displayDesc2 = getTranslatedDetail('paragraph_2', language, !eventData ? t.p2 : '');
+  const topTag = getTranslatedDetail('top_tag', language, tNews.eventTag);
+  const infoTitle = getTranslatedDetail('info_title', language, !eventData ? t.infoTitle : '');
+
+  const bulletPointsText = getTranslatedDetail('bullet_points', language, '');
+  const bullets = bulletPointsText
+    ? bulletPointsText.split('\n').filter((b: string) => b.trim() !== '')
     : (!eventData ? [t.dish1, t.dish2, t.dish3, t.dish4, t.dish5] : []);
 
-  const displayDesc3 = details.paragraph_3 || (!eventData ? t.p3 : '');
-  const priceText = details.price_text || t.priceText;
-  const bookingBtn = details.booking_btn_text || t.bookingBtn;
-  const locationText = details.location_text || "Restaurant Bag Søjlen\nHovedgaden 5, 8410 Rønde";
-  const timeText = details.time_text || "Kl. 18.00";
+  const displayDesc3 = getTranslatedDetail('paragraph_3', language, !eventData ? t.p3 : '');
+  const priceText = getTranslatedDetail('price_text', language, t.priceText);
+  const bookingBtn = getTranslatedDetail('booking_btn_text', language, t.bookingBtn);
+  const locationText = getTranslatedDetail('location_text', language, "Restaurant Bag Søjlen\nHovedgaden 5, 8410 Rønde");
+  const timeText = getTranslatedDetail('time_text', language, "Kl. 18.00");
 
   return (
     <div className="bg-[#faf9f6] min-h-screen">

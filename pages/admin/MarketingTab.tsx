@@ -98,14 +98,24 @@ export const MarketingTab: React.FC = () => {
             const newContent = { ...editingReview };
 
             for (const targetLang of targetLangs) {
-                // MyMemory Free API - Note: max 500 words/day without key, fine for occasional reviews
-                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=${sourceLang}|${targetLang}`);
-                const data = await res.json();
+                const deepLTarget = targetLang === 'en' ? 'EN-GB' : targetLang.toUpperCase();
+                const { data, error } = await supabase.functions.invoke('translate', {
+                    body: {
+                        text: [textToTranslate],
+                        target_lang: deepLTarget
+                    }
+                });
                 
-                if (data?.responseData?.translatedText) {
-                    if (targetLang === 'da') newContent.content = data.responseData.translatedText;
-                    if (targetLang === 'en') newContent.content_en = data.responseData.translatedText;
-                    if (targetLang === 'de') newContent.content_de = data.responseData.translatedText;
+                if (error) {
+                    console.error('DeepL Translation API Error:', error);
+                    continue;
+                }
+                
+                if (data?.translations?.[0]?.text) {
+                    const translatedText = data.translations[0].text;
+                    if (targetLang === 'da') newContent.content = translatedText;
+                    if (targetLang === 'en') newContent.content_en = translatedText;
+                    if (targetLang === 'de') newContent.content_de = translatedText;
                 }
             }
             
