@@ -8,10 +8,17 @@ export const EventsTab: React.FC = () => {
     const [featuredEventId, setFeaturedEventId] = useState<string | null>(null);
 
     const [isEditing, setIsEditing] = useState(false);
+    const [activeLang, setActiveLang] = useState<'da' | 'en' | 'de'>('da');
+    const [isTranslating, setIsTranslating] = useState(false);
+    
     const [editingItem, setEditingItem] = useState({
         id: '',
         title: '',
+        title_en: '',
+        title_de: '',
         description: '',
+        description_en: '',
+        description_de: '',
         end_date: '',
         image_url: '',
         is_published: true,
@@ -27,14 +34,102 @@ export const EventsTab: React.FC = () => {
             booking_btn_text: 'BESTIL BORD TIL ARRANGEMENTET',
             time_text: '',
             location_text: 'Restaurant Bag Søjlen\nHovedgaden 5, 8410 Rønde'
-        }
+        },
+        details_en: {},
+        details_de: {}
     });
 
-    const handleDetailsChange = (field: string, value: string) => {
-        setEditingItem(prev => ({
-            ...prev,
-            details: { ...prev.details, [field]: value }
-        }));
+    const handleDetailsChange = (field: string, value: string, lang = activeLang) => {
+        setEditingItem(prev => {
+            const detailsKey = lang === 'da' ? 'details' : `details_${lang}`;
+            return {
+                ...prev,
+                [detailsKey]: { ...prev[detailsKey as keyof typeof prev] as any, [field]: value }
+            };
+        });
+    };
+
+    const getField = (field: string) => {
+        if (activeLang === 'da') return editingItem[field as keyof typeof editingItem] as string;
+        return editingItem[`${field}_${activeLang}` as keyof typeof editingItem] as string;
+    };
+
+    const setField = (field: string, value: string) => {
+        if (activeLang === 'da') setEditingItem(prev => ({ ...prev, [field]: value }));
+        else setEditingItem(prev => ({ ...prev, [`${field}_${activeLang}`]: value }));
+    };
+
+    const getDetail = (field: string) => {
+        const detailsObj = activeLang === 'da' ? editingItem.details : (editingItem[`details_${activeLang}` as keyof typeof editingItem] as any || {});
+        return detailsObj[field] || '';
+    };
+
+    const handleAutoTranslate = async () => {
+        setIsTranslating(true);
+        try {
+            const sourceLang = activeLang;
+            const targetLangs = ['da', 'en', 'de'].filter(l => l !== sourceLang);
+            
+            const newItem = { ...editingItem };
+            let hasText = false;
+
+            // Direct string fields
+            const fieldsToTranslate = ['title', 'description'];
+            
+            // Details object fields
+            const detailsFieldsToTranslate = ['top_tag', 'hero_date', 'paragraph_1', 'paragraph_2', 'info_title', 'bullet_points', 'paragraph_3', 'price_text', 'booking_btn_text', 'time_text', 'location_text'];
+
+            for (const targetLang of targetLangs) {
+                // Translate direct strings
+                for (const field of fieldsToTranslate) {
+                    const sourceKey = sourceLang === 'da' ? field : `${field}_${sourceLang}`;
+                    const targetKey = targetLang === 'da' ? field : `${field}_${targetLang}`;
+                    const text = newItem[sourceKey as keyof typeof newItem] as string;
+                    
+                    if (text && text.trim()) {
+                        hasText = true;
+                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
+                        const data = await res.json();
+                        if (data?.responseData?.translatedText) {
+                            (newItem as any)[targetKey] = data.responseData.translatedText;
+                        }
+                    }
+                }
+
+                // Translate Details object keys
+                const sourceDetailsKey = sourceLang === 'da' ? 'details' : `details_${sourceLang}`;
+                const targetDetailsKey = targetLang === 'da' ? 'details' : `details_${targetLang}`;
+                
+                const sourceDetails = (newItem as any)[sourceDetailsKey] || {};
+                const targetDetails = { ...((newItem as any)[targetDetailsKey] || {}) };
+                
+                for (const dField of detailsFieldsToTranslate) {
+                    const text = sourceDetails[dField];
+                    if (text && text.trim()) {
+                        hasText = true;
+                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`);
+                        const data = await res.json();
+                        if (data?.responseData?.translatedText) {
+                            targetDetails[dField] = data.responseData.translatedText;
+                        }
+                    }
+                }
+                (newItem as any)[targetDetailsKey] = targetDetails;
+            }
+
+            if (!hasText) {
+                alert('Please enter text to translate.');
+                return;
+            }
+
+            setEditingItem(newItem);
+            alert('Translation complete!');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to auto-translate.');
+        } finally {
+            setIsTranslating(false);
+        }
     };
 
     const [uploadingImage, setUploadingImage] = useState(false);
@@ -171,11 +266,26 @@ export const EventsTab: React.FC = () => {
     if (isEditing) {
         return (
             <div className="bg-white p-8 border border-gray-100 shadow-xl max-w-3xl animate-in fade-in">
-                <h3 className="text-2xl serif italic mb-6">{editingItem.id ? 'Edit Event' : 'Create New Event'}</h3>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-2xl serif italic">{editingItem.id ? 'Edit Event' : 'Create New Event'}</h3>
+                    <div className="flex bg-gray-100 p-1 rounded-sm shadow-inner">
+                        <button type="button" onClick={() => setActiveLang('da')} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-sm ${activeLang === 'da' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}>DA</button>
+                        <button type="button" onClick={() => setActiveLang('en')} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-sm ${activeLang === 'en' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}>EN</button>
+                        <button type="button" onClick={() => setActiveLang('de')} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-sm ${activeLang === 'de' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}>DE</button>
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-center bg-gray-50 p-4 border border-gray-100 mb-8 rounded-sm">
+                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Auto-Translation Settings</div>
+                    <button type="button" onClick={handleAutoTranslate} disabled={isTranslating} className="text-[10px] bg-white border border-gray-200 px-4 py-2 font-bold uppercase tracking-widest text-[#CDA235] hover:border-[#CDA235] transition-colors flex items-center gap-2 disabled:opacity-50">
+                        {isTranslating ? 'Translating...' : '✨ Auto-Translate All Fields'}
+                    </button>
+                </div>
+
                 <form onSubmit={handleSave} className="space-y-6">
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Event Title</label>
-                        <input required type="text" value={editingItem.title} onChange={e => setEditingItem({ ...editingItem, title: e.target.value })} className="w-full text-lg border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors" placeholder="e.g. Valentine's Day Special Menu" />
+                        <input required type="text" value={getField('title')} onChange={e => setField('title', e.target.value)} className="w-full text-lg border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors" placeholder="e.g. Valentine's Day" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -192,22 +302,22 @@ export const EventsTab: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Top Tag</label>
-                            <input type="text" value={editingItem.details?.top_tag || ''} onChange={e => handleDetailsChange('top_tag', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235]" placeholder="e.g. BEGIVENHED" />
+                            <input type="text" value={getDetail('top_tag')} onChange={e => handleDetailsChange('top_tag', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235]" placeholder="e.g. BEGIVENHED" />
                         </div>
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Display Date (Hero Override)</label>
-                            <input type="text" value={editingItem.details?.hero_date || ''} onChange={e => handleDetailsChange('hero_date', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235]" placeholder="e.g. FREDAG 6. - 8. MARTS 2026" />
+                            <input type="text" value={getDetail('hero_date')} onChange={e => handleDetailsChange('hero_date', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235]" placeholder="e.g. FREDAG 6. - 8. MARTS 2026" />
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Paragraph 1 (Main Description)</label>
-                        <textarea value={editingItem.details?.paragraph_1 || editingItem.description || ''} onChange={e => handleDetailsChange('paragraph_1', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] min-h-[100px]" placeholder="Drømmer du om en aften fyldt med..." />
+                        <textarea value={getDetail('paragraph_1') || getField('description')} onChange={e => handleDetailsChange('paragraph_1', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] min-h-[100px]" placeholder="Drømmer du om en aften fyldt med..." />
                     </div>
 
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Paragraph 2</label>
-                        <textarea value={editingItem.details?.paragraph_2 || ''} onChange={e => handleDetailsChange('paragraph_2', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] min-h-[80px]" placeholder="Glæd dig til en kulinarisk rejse..." />
+                        <textarea value={getDetail('paragraph_2')} onChange={e => handleDetailsChange('paragraph_2', e.target.value)} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] min-h-[80px]" placeholder="Glæd dig til en kulinarisk rejse..." />
                     </div>
 
                     <div>
@@ -239,15 +349,15 @@ export const EventsTab: React.FC = () => {
                         <h4 className="text-xl serif italic text-[#1a1a1a]">Event Flyer Details</h4>
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Info Section Title</label>
-                            <input type="text" value={editingItem.details?.info_title || ''} onChange={e => handleDetailsChange('info_title', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" />
+                            <input type="text" value={getDetail('info_title')} onChange={e => handleDetailsChange('info_title', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" />
                         </div>
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Menu / Bullet Points (One per line)</label>
-                            <textarea value={editingItem.details?.bullet_points || ''} onChange={e => handleDetailsChange('bullet_points', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235] min-h-[120px]" placeholder="Bruschetta med røget laks&#10;Vitello Tonnato" />
+                            <textarea value={getDetail('bullet_points')} onChange={e => handleDetailsChange('bullet_points', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235] min-h-[120px]" placeholder="Bruschetta med røget laks&#10;Vitello Tonnato" />
                         </div>
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Paragraph 3 (Below Menu)</label>
-                            <textarea value={editingItem.details?.paragraph_3 || ''} onChange={e => handleDetailsChange('paragraph_3', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235] min-h-[80px]" />
+                            <textarea value={getDetail('paragraph_3')} onChange={e => handleDetailsChange('paragraph_3', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235] min-h-[80px]" />
                         </div>
                     </div>
 
@@ -255,20 +365,20 @@ export const EventsTab: React.FC = () => {
                         <h4 className="text-xl serif italic text-[#1a1a1a]">Booking Banner Setup</h4>
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Price Banner Text</label>
-                            <input type="text" value={editingItem.details?.price_text || ''} onChange={e => handleDetailsChange('price_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="Prisen er 750,- pr. person..." />
+                            <input type="text" value={getDetail('price_text')} onChange={e => handleDetailsChange('price_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="Prisen er 750,- pr. person..." />
                         </div>
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Booking Button Label</label>
-                            <input type="text" value={editingItem.details?.booking_btn_text || ''} onChange={e => handleDetailsChange('booking_btn_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="BESTIL BORD TIL ARRANGEMENTET" />
+                            <input type="text" value={getDetail('booking_btn_text')} onChange={e => handleDetailsChange('booking_btn_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="BESTIL BORD TIL ARRANGEMENTET" />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Location Address Text (Optional)</label>
-                                <textarea value={editingItem.details?.location_text || ''} onChange={e => handleDetailsChange('location_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235] min-h-[60px]" placeholder="Restaurant Bag Søjlen..." />
+                                <textarea value={getDetail('location_text')} onChange={e => handleDetailsChange('location_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235] min-h-[60px]" placeholder="Restaurant Bag Søjlen..." />
                             </div>
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Time Details</label>
-                                <input type="text" value={editingItem.details?.time_text || ''} onChange={e => handleDetailsChange('time_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="Kl. 18.00" />
+                                <input type="text" value={getDetail('time_text')} onChange={e => handleDetailsChange('time_text', e.target.value)} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="Kl. 18.00" />
                             </div>
                         </div>
                     </div>
@@ -301,7 +411,11 @@ export const EventsTab: React.FC = () => {
                         setEditingItem({
                             id: '',
                             title: '',
+                            title_en: '',
+                            title_de: '',
                             description: '',
+                            description_en: '',
+                            description_de: '',
                             start_date: '',
                             end_date: '',
                             image_url: '',
@@ -318,7 +432,9 @@ export const EventsTab: React.FC = () => {
                                 booking_btn_text: 'BESTIL BORD TIL ARRANGEMENTET',
                                 time_text: '',
                                 location_text: 'Restaurant Bag Søjlen\nHovedgaden 5, 8410 Rønde'
-                            }
+                            },
+                            details_en: {},
+                            details_de: {}
                         });
                         setIsEditing(true);
                     }}

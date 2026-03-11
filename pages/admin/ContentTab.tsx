@@ -6,6 +6,7 @@ export const ContentTab: React.FC = () => {
     const [settings, setSettings] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(false);
     const [activeLang, setActiveLang] = useState<'da' | 'en' | 'de'>('da');
+    const [isTranslating, setIsTranslating] = useState(false);
 
     // Base keys without language suffix
     const baseKeys = ['hero_welcome', 'hero_title', 'hero_subtitle', 'hero_btn_book', 'hero_btn_menu', 'footer_desc', 'events_tag', 'events_title', 'events_sub', 'events_phone', 'events_contact', 'events_localText', 'events_finalText'];
@@ -64,6 +65,56 @@ export const ContentTab: React.FC = () => {
         setSettings({ ...settings, [getFormKey(baseKey)]: value });
     };
 
+    const handleAutoTranslate = async () => {
+        setIsTranslating(true);
+        try {
+            const sourceLang = activeLang;
+            
+            const keysToTranslate = [
+                'hero_welcome', 'hero_title', 'hero_subtitle', 'hero_btn_book', 'hero_btn_menu', 
+                'footer_desc', 
+                'events_tag', 'events_title', 'events_sub', 'events_contact', 'events_localText', 'events_finalText'
+            ];
+            const targetLangs = ['da', 'en', 'de'].filter(l => l !== sourceLang);
+            
+            const newSettings = { ...settings };
+            let hasText = false;
+
+            for (const key of keysToTranslate) {
+                const sourceKey = sourceLang === 'da' ? key : `${key}_${sourceLang}`;
+                const textToTranslate = settings[sourceKey];
+                
+                if (textToTranslate && textToTranslate.trim() !== '') {
+                    hasText = true;
+                    for (const targetLang of targetLangs) {
+                        const targetKey = targetLang === 'da' ? key : `${key}_${targetLang}`;
+                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=${sourceLang}|${targetLang}`);
+                        const data = await res.json();
+                        
+                        if (data?.responseData?.translatedText) {
+                            newSettings[targetKey] = data.responseData.translatedText;
+                        }
+                    }
+                }
+            }
+            
+            if (!hasText) {
+                alert('Please enter some text in the current language tab before translating.');
+                setIsTranslating(false);
+                return;
+            }
+            
+            setSettings(newSettings);
+            alert('Translation complete! Please review the other tabs to verify.');
+            
+        } catch (error) {
+            console.error('Translation error:', error);
+            alert('Failed to auto-translate. The free translation service might be temporarily unavailable.');
+        } finally {
+            setIsTranslating(false);
+        }
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-300 max-w-3xl">
             <div className="mb-8 border-b border-[#CDA235]/20 pb-8">
@@ -98,6 +149,18 @@ export const ContentTab: React.FC = () => {
             </div>
 
             <form onSubmit={handleSave} className="bg-white p-8 border border-gray-100 shadow-[0_20px_40px_rgba(0,0,0,0.03)] space-y-8">
+                
+                <div className="flex justify-between items-center bg-gray-50 p-4 border border-gray-100 mb-8 rounded-sm">
+                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Auto-Translation Settings</div>
+                    <button 
+                        type="button" 
+                        onClick={handleAutoTranslate}
+                        disabled={isTranslating}
+                        className="text-[10px] bg-white border border-gray-200 px-4 py-2 font-bold uppercase tracking-widest text-[#CDA235] hover:border-[#CDA235] transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {isTranslating ? 'Translating...' : '✨ Auto-Translate All Fields'}
+                    </button>
+                </div>
                 <div>
                     <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Hero Welcome Text (Small Tag)</label>
                     <input
