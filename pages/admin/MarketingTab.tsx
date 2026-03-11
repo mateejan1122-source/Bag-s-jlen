@@ -12,7 +12,9 @@ export const MarketingTab: React.FC = () => {
 
     // Editing State (Reviews)
     const [isEditingReview, setIsEditingReview] = useState(false);
-    const [editingReview, setEditingReview] = useState({ id: '', author_name: '', rating: 5, content: '', is_published: true });
+    const [editingReview, setEditingReview] = useState({ id: '', author_name: '', rating: 5, content: '', content_en: '', content_de: '', is_published: true });
+    const [activeLangMode, setActiveLangMode] = useState<'da' | 'en' | 'de'>('da');
+    const [isTranslating, setIsTranslating] = useState(false);
 
     useEffect(() => {
         if (activeSection === 'reviews') {
@@ -57,6 +59,8 @@ export const MarketingTab: React.FC = () => {
                     author_name: editingReview.author_name,
                     rating: editingReview.rating,
                     content: editingReview.content,
+                    content_en: editingReview.content_en,
+                    content_de: editingReview.content_de,
                     is_published: editingReview.is_published
                 }).eq('id', editingReview.id);
                 if (error) throw error;
@@ -72,6 +76,47 @@ export const MarketingTab: React.FC = () => {
             alert(`Failed to save review: ${err.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAutoTranslate = async () => {
+        setIsTranslating(true);
+        try {
+            const sourceLang = activeLangMode;
+            let textToTranslate = '';
+            if (sourceLang === 'da') textToTranslate = editingReview.content;
+            if (sourceLang === 'en') textToTranslate = editingReview.content_en;
+            if (sourceLang === 'de') textToTranslate = editingReview.content_de;
+
+            if (!textToTranslate || textToTranslate.trim() === '') {
+                alert('Please enter some text in the current language tab first before translating.');
+                setIsTranslating(false);
+                return;
+            }
+
+            const targetLangs = ['da', 'en', 'de'].filter(l => l !== sourceLang);
+            const newContent = { ...editingReview };
+
+            for (const targetLang of targetLangs) {
+                // MyMemory Free API - Note: max 500 words/day without key, fine for occasional reviews
+                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=${sourceLang}|${targetLang}`);
+                const data = await res.json();
+                
+                if (data?.responseData?.translatedText) {
+                    if (targetLang === 'da') newContent.content = data.responseData.translatedText;
+                    if (targetLang === 'en') newContent.content_en = data.responseData.translatedText;
+                    if (targetLang === 'de') newContent.content_de = data.responseData.translatedText;
+                }
+            }
+            
+            setEditingReview(newContent);
+            alert('Translation complete! Please review the other tabs to verify.');
+            
+        } catch (error) {
+            console.error('Translation error:', error);
+            alert('Failed to auto-translate. The free translation service might be temporarily unavailable.');
+        } finally {
+            setIsTranslating(false);
         }
     };
 
@@ -159,8 +204,33 @@ export const MarketingTab: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Review Content</label>
-                                    <textarea required value={editingReview.content} onChange={e => setEditingReview({ ...editingReview, content: e.target.value })} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors min-h-[120px]" placeholder="The food was amazing..." />
+                                    <div className="flex justify-between items-end mb-2">
+                                        <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold">Review Content</label>
+                                        <div className="flex gap-4 items-center">
+                                            <button 
+                                                type="button" 
+                                                onClick={handleAutoTranslate}
+                                                disabled={isTranslating}
+                                                className="text-[9px] font-bold uppercase tracking-widest text-[#CDA235] hover:text-[#1a1a1a] transition-colors flex items-center gap-1 disabled:opacity-50"
+                                            >
+                                                {isTranslating ? 'Translating...' : '✨ Auto-Translate'}
+                                            </button>
+                                            <div className="flex bg-gray-100 p-1 rounded-sm">
+                                                <button type="button" onClick={() => setActiveLangMode('da')} className={`px-4 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${activeLangMode === 'da' ? 'bg-white shadow-sm text-[#CDA235]' : 'text-gray-500 hover:text-[#1a1a1a]'}`}>DA</button>
+                                                <button type="button" onClick={() => setActiveLangMode('en')} className={`px-4 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${activeLangMode === 'en' ? 'bg-white shadow-sm text-[#CDA235]' : 'text-gray-500 hover:text-[#1a1a1a]'}`}>EN</button>
+                                                <button type="button" onClick={() => setActiveLangMode('de')} className={`px-4 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${activeLangMode === 'de' ? 'bg-white shadow-sm text-[#CDA235]' : 'text-gray-500 hover:text-[#1a1a1a]'}`}>DE</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {activeLangMode === 'da' && (
+                                        <textarea required value={editingReview.content} onChange={e => setEditingReview({ ...editingReview, content: e.target.value })} className="w-full text-base border border-gray-200 py-3 px-4 bg-gray-50 focus:bg-white focus:outline-none focus:border-[#CDA235] transition-colors min-h-[120px]" placeholder="The food was amazing..." />
+                                    )}
+                                    {activeLangMode === 'en' && (
+                                        <textarea value={editingReview.content_en || ''} onChange={e => setEditingReview({ ...editingReview, content_en: e.target.value })} className="w-full text-base border border-gray-200 py-3 px-4 bg-gray-50 focus:bg-white focus:outline-none focus:border-[#CDA235] transition-colors min-h-[120px]" placeholder="English translation..." />
+                                    )}
+                                    {activeLangMode === 'de' && (
+                                        <textarea value={editingReview.content_de || ''} onChange={e => setEditingReview({ ...editingReview, content_de: e.target.value })} className="w-full text-base border border-gray-200 py-3 px-4 bg-gray-50 focus:bg-white focus:outline-none focus:border-[#CDA235] transition-colors min-h-[120px]" placeholder="German translation..." />
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-3 pt-4">
                                     <input type="checkbox" id="is_published" checked={editingReview.is_published} onChange={e => setEditingReview({ ...editingReview, is_published: e.target.checked })} className="w-4 h-4 accent-[#CDA235]" />
@@ -178,7 +248,7 @@ export const MarketingTab: React.FC = () => {
                     ) : (
                         <div>
                             <div className="flex justify-end mb-6">
-                                <button type="button" onClick={() => { setEditingReview({ id: '', author_name: '', rating: 5, content: '', is_published: true }); setIsEditingReview(true); }} className="bg-[#1a1a1a] text-white px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#CDA235] transition-colors flex items-center gap-2">
+                                <button type="button" onClick={() => { setEditingReview({ id: '', author_name: '', rating: 5, content: '', content_en: '', content_de: '', is_published: true }); setIsEditingReview(true); }} className="bg-[#1a1a1a] text-white px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#CDA235] transition-colors flex items-center gap-2">
                                     <Plus size={14} /> Add Testimonial
                                 </button>
                             </div>

@@ -93,7 +93,7 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
             />
           </div>
           <p className="text-gray-500 text-[14px] leading-relaxed max-w-[320px] font-light">
-            {t.philosophy}
+            {language === 'da' ? (settings.footer_desc || t.philosophy) : (settings[`footer_desc_${language}`] || settings.footer_desc || t.philosophy)}
           </p>
         </div>
 
@@ -174,8 +174,7 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
           <button
             onClick={() => navigate('/manage')}
-            style={{ borderColor: `${brandGold}44`, color: brandGold }}
-            className="px-8 py-3 border hover:bg-[#CDA235] hover:text-white transition-all uppercase tracking-[0.3em] text-[10px] font-bold"
+            className="px-8 py-3 border border-[#CDA235]/30 text-[#CDA235] hover:bg-[#CDA235] hover:text-white transition-all uppercase tracking-[0.3em] text-[10px] font-bold"
           >
             {t.manage}
           </button>

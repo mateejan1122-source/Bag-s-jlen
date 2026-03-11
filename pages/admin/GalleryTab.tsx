@@ -10,9 +10,79 @@ export const GalleryTab: React.FC = () => {
     const [editingItem, setEditingItem] = useState({ id: '', title: '', image_url: '', display_order: 0, is_published: true });
     const [uploadingImage, setUploadingImage] = useState(false);
 
+    const [settings, setSettings] = useState<Record<string, string>>({
+        hero_bg_image: '', hero_video_url: '', philosophy_img: '', seasonal_img: ''
+    });
+    const [savingSettings, setSavingSettings] = useState(false);
+
     useEffect(() => {
         fetchImages();
+        fetchSettings();
     }, []);
+
+    const fetchSettings = async () => {
+        try {
+            const { data } = await supabase.from('settings').select('*');
+            if (data) {
+                const s = data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {} as Record<string, string>);
+                setSettings(prev => ({ ...prev, ...s }));
+            }
+        } catch (err) {
+            console.error('Error fetching settings:', err);
+        }
+    };
+
+    const handleSettingImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        setUploadingImage(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `settings/${fileName}`;
+            const { error: uploadError } = await supabase.storage.from('public-images').upload(filePath, file);
+            if (uploadError) throw uploadError;
+            const { data: { publicUrl } } = supabase.storage.from('public-images').getPublicUrl(filePath);
+            setSettings(prev => ({ ...prev, [key]: publicUrl }));
+        } catch (err: any) {
+            alert(`Failed to upload image. Error: ${err.message || 'Unknown error'}`);
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
+    const handleSaveSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Basic validation for common video portals that won't work in a <video> tag
+        if (settings.hero_video_url && (settings.hero_video_url.includes('youtube.com') || settings.hero_video_url.includes('youtu.be') || settings.hero_video_url.includes('vimeo.com'))) {
+            alert('YouTube and Vimeo links are not supported as background videos. Please upload an .mp4 file directly or provide a direct video link.');
+            return;
+        }
+
+        setSavingSettings(true);
+        const toUpdate = ['hero_bg_image', 'hero_video_url', 'philosophy_img', 'seasonal_img'];
+        try {
+            const upsertData = toUpdate
+                .filter(key => settings[key] !== undefined && settings[key] !== null)
+                .map(key => ({
+                    key,
+                    value: settings[key],
+                    category: 'general'
+                }));
+
+            if (upsertData.length > 0) {
+                const { error } = await supabase.from('settings').upsert(upsertData, { onConflict: 'key' });
+                if (error) throw error;
+            }
+            alert('Homepage media updated successfully!');
+        } catch (err: any) {
+            console.error(err);
+            alert(`Failed to save homepage media. ${err.message || ''}`);
+        } finally {
+            setSavingSettings(false);
+        }
+    };
 
     const fetchImages = async () => {
         setLoading(true);
@@ -176,7 +246,7 @@ export const GalleryTab: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-[#CDA235]/20 pb-8">
                 <div>
                     <span className="text-[#CDA235] text-[11px] font-bold tracking-[0.5em] uppercase block mb-2">ASSETS</span>
-                    <h1 className="text-4xl md:text-5xl serif italic text-[#1a1a1a]">Image Gallery</h1>
+                    <h1 className="text-4xl md:text-5xl serif italic text-[#1a1a1a]">Image Gallery & Media</h1>
                 </div>
                 <button
                     onClick={() => {
@@ -188,6 +258,85 @@ export const GalleryTab: React.FC = () => {
                     <Plus size={14} /> Upload Image
                 </button>
             </div>
+
+            <div className="bg-white p-8 border border-gray-100 shadow-[0_20px_40px_rgba(0,0,0,0.03)] space-y-8 mb-12">
+                <h2 className="text-2xl serif italic mb-6">Homepage Media</h2>
+                <form onSubmit={handleSaveSettings} className="space-y-8">
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-4">Hero Background Image (Fallback)</label>
+                                <div className="flex items-center gap-6">
+                                    <div className="w-24 h-24 bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                        {settings.hero_bg_image ? <img src={settings.hero_bg_image} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="cursor-pointer bg-[#1a1a1a] text-white px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] inline-block hover:bg-[#CDA235] transition-colors">
+                                            Upload Image <input type="file" accept="image/*" onChange={(e) => handleSettingImageUpload(e, 'hero_bg_image')} className="hidden" />
+                                        </label>
+                                        <input type="text" value={settings.hero_bg_image || ''} onChange={(e) => setSettings({ ...settings, hero_bg_image: e.target.value })} className="w-full mt-2 text-sm border-b border-gray-200 py-2 focus:outline-none focus:border-[#CDA235]" placeholder="Or Image URL..." />
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-4">Hero Background Video</label>
+                                <div className="flex items-center gap-6">
+                                    <div className="w-24 h-24 bg-gray-50 border border-gray-200 flex flex-col items-center justify-center overflow-hidden">
+                                        {settings.hero_video_url ? <span className="text-[10px] font-bold text-[#CDA235] text-center px-2">VIDEO<br />PROVIDED</span> : <span className="text-gray-300 text-[10px] uppercase font-bold">NONE</span>}
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="cursor-pointer bg-[#1a1a1a] text-white px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] inline-block hover:bg-[#CDA235] transition-colors">
+                                            Upload Video <input type="file" accept="video/*" onChange={(e) => handleSettingImageUpload(e, 'hero_video_url')} className="hidden" />
+                                        </label>
+                                        <input type="text" value={settings.hero_video_url || ''} onChange={(e) => setSettings({ ...settings, hero_video_url: e.target.value })} className="w-full mt-2 text-sm border-b border-gray-200 py-2 focus:outline-none focus:border-[#CDA235]" placeholder="Or direct Video URL (.mp4)..." />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2 font-light">Upload an mp4 video or provide a direct video link. (YouTube links are not supported).</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-4">Our Food Philosophy Image</label>
+                                <div className="flex items-center gap-6">
+                                    <div className="w-24 h-24 bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                        {settings.philosophy_img ? <img src={settings.philosophy_img} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="cursor-pointer bg-[#1a1a1a] text-white px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] inline-block hover:bg-[#CDA235] transition-colors">
+                                            Upload Image <input type="file" accept="image/*" onChange={(e) => handleSettingImageUpload(e, 'philosophy_img')} className="hidden" />
+                                        </label>
+                                        <input type="text" value={settings.philosophy_img || ''} onChange={(e) => setSettings({ ...settings, philosophy_img: e.target.value })} className="w-full mt-2 text-sm border-b border-gray-200 py-2 focus:outline-none focus:border-[#CDA235]" placeholder="Or Image URL..." />
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-4">Seasonal Experiences Image</label>
+                                <div className="flex items-center gap-6">
+                                    <div className="w-24 h-24 bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                        {settings.seasonal_img ? <img src={settings.seasonal_img} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="cursor-pointer bg-[#1a1a1a] text-white px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] inline-block hover:bg-[#CDA235] transition-colors">
+                                            Upload Image <input type="file" accept="image/*" onChange={(e) => handleSettingImageUpload(e, 'seasonal_img')} className="hidden" />
+                                        </label>
+                                        <input type="text" value={settings.seasonal_img || ''} onChange={(e) => setSettings({ ...settings, seasonal_img: e.target.value })} className="w-full mt-2 text-sm border-b border-gray-200 py-2 focus:outline-none focus:border-[#CDA235]" placeholder="Or Image URL..." />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-100">
+                        <button type="submit" disabled={savingSettings || uploadingImage} className="px-8 py-4 bg-[#CDA235] text-white text-[10px] uppercase font-bold tracking-widest hover:bg-black transition-colors disabled:opacity-50">
+                            {savingSettings ? 'Saving...' : 'Save Homepage Media'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div className="mb-4 text-2xl serif italic text-[#1a1a1a]">Gallery Images</div>
 
             {loading && images.length === 0 ? (
                 <div className="text-center py-16 text-gray-400 text-[12px] uppercase tracking-[0.4em] font-bold">Loading Gallery...</div>

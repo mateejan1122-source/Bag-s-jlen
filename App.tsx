@@ -11,6 +11,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { DynamicPage } from './pages/DynamicPage';
+import { HistoryPage } from './pages/HistoryPage';
 import { BookingData } from './types';
 import { Language, translations } from './translations';
 interface AllergyModalProps {
@@ -141,6 +142,13 @@ const App: React.FC = () => {
             <Route path="/event" element={<EventDetail language={language} onBookingStart={handleBookingStart} />} />
             <Route path="/manage" element={<ManageReservation language={language} confirmedBooking={confirmedBooking} initialFlow="verify" />} />
             <Route path="/admin" element={<AdminDashboard language={language} />} />
+            
+            {/* History Page Routes */}
+            <Route path="/history" element={<HistoryPage language={language} />} />
+            <Route path="/our-history" element={<HistoryPage language={language} />} />
+            <Route path="/vores-historie" element={<HistoryPage language={language} />} />
+            <Route path="/unsere-geschichte" element={<HistoryPage language={language} />} />
+
             <Route path="/:slug" element={<DynamicPage language={language} />} />
           </Routes>
         </main>

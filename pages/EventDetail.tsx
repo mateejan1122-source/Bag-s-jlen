@@ -17,14 +17,31 @@ export const EventDetail: React.FC<EventDetailProps> = ({ onBookingStart, langua
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      supabase.from('events').select('*').eq('id', id).single().then(({ data }) => {
+    const fetchEventData = async () => {
+      if (id) {
+        const { data } = await supabase.from('events').select('*').eq('id', id).single();
         setEventData(data);
-        setLoading(false);
-      });
-    } else {
+      } else {
+        // Fallback to featured event, then to latest event
+        const { data: settingsData } = await supabase.from('settings').select('*').eq('key', 'featured_event_id').maybeSingle();
+        if (settingsData && settingsData.value) {
+          const { data } = await supabase.from('events').select('*').eq('id', settingsData.value).single();
+          if (data) {
+            setEventData(data);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        const { data } = await supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(1);
+        if (data && data.length > 0) {
+          setEventData(data[0]);
+        }
+      }
       setLoading(false);
-    }
+    };
+
+    fetchEventData();
   }, [id]);
 
   if (loading) return <div className="min-h-screen bg-[#faf9f6] flex items-center justify-center">Loading...</div>;

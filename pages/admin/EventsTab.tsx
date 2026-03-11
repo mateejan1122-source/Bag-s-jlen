@@ -362,7 +362,7 @@ export const EventsTab: React.FC = () => {
                                         {event.end_date && ` - ${new Date(event.end_date).toLocaleDateString()}`}
                                     </div>
                                 )}
-                                <p className="text-gray-600 text-sm line-clamp-3 mb-6 flex-1">{event.description}</p>
+                                <p className="text-gray-600 text-sm line-clamp-3 mb-6 flex-1">{event.details?.paragraph_1 || event.description}</p>
 
                                 <div className="flex gap-2 justify-end border-t border-gray-50 pt-4 md:opacity-0 group-hover:opacity-100 transition-opacity flex-wrap">
                                     {featuredEventId !== event.id && event.is_published && (

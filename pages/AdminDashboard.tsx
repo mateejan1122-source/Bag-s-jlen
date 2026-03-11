@@ -13,8 +13,9 @@ import { EventsTab } from './admin/EventsTab';
 import { GalleryTab } from './admin/GalleryTab';
 import { MarketingTab } from './admin/MarketingTab';
 import { AppearanceTab } from './admin/AppearanceTab';
+import { HistoryTab } from './admin/HistoryTab';
 
-type AdminTab = 'reservations' | 'menu' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'settings' | 'appearance';
+type AdminTab = 'reservations' | 'menu' | 'history' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'settings' | 'appearance';
 
 export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -157,6 +158,14 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     </button>
 
                     <button
+                        onClick={() => { setActiveTab('history'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'history' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <FileText size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Our History</span>
+                    </button>
+
+                    <button
                         onClick={() => { setActiveTab('pages'); setIsSidebarOpen(false); }}
                         className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'pages' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
@@ -233,6 +242,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                 <div className="max-w-[1200px] mx-auto">
                     {activeTab === 'reservations' && <ReservationsTab />}
                     {activeTab === 'menu' && <MenuTab />}
+                    {activeTab === 'history' && <HistoryTab />}
                     {activeTab === 'pages' && <PagesTab />}
                     {activeTab === 'content' && <ContentTab />}
                     {activeTab === 'events' && <EventsTab />}

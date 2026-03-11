@@ -101,9 +101,9 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
               <span className="text-[10px] font-bold uppercase">{language}</span>
             </button>
             <div className="absolute top-full right-0 mt-2 bg-black border border-white/10 shadow-2xl py-2 min-w-[100px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-              <button onClick={() => onLanguageChange('da')} className={`w-full text-left px-4 py-2 text-[10px] hover:bg-[#c5a059] hover:text-white transition-colors ${language === 'da' ? 'text-[#c5a059]' : 'text-white/60'}`}>DA</button>
-              <button onClick={() => onLanguageChange('en')} className={`w-full text-left px-4 py-2 text-[10px] hover:bg-[#c5a059] hover:text-white transition-colors ${language === 'en' ? 'text-[#c5a059]' : 'text-white/60'}`}>EN</button>
-              <button onClick={() => onLanguageChange('de')} className={`w-full text-left px-4 py-2 text-[10px] hover:bg-[#c5a059] hover:text-white transition-colors ${language === 'de' ? 'text-[#c5a059]' : 'text-white/60'}`}>DE</button>
+              <button onClick={() => { onLanguageChange('da'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2 text-[10px] hover:bg-[#c5a059] hover:text-white transition-colors ${language === 'da' ? 'text-[#c5a059]' : 'text-white/60'}`}>DA</button>
+              <button onClick={() => { onLanguageChange('en'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2 text-[10px] hover:bg-[#c5a059] hover:text-white transition-colors ${language === 'en' ? 'text-[#c5a059]' : 'text-white/60'}`}>EN</button>
+              <button onClick={() => { onLanguageChange('de'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2 text-[10px] hover:bg-[#c5a059] hover:text-white transition-colors ${language === 'de' ? 'text-[#c5a059]' : 'text-white/60'}`}>DE</button>
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BookingData } from '../types';
 import { Language, translations } from '../translations';
 import { supabase } from '../lib/supabase';
@@ -10,10 +11,9 @@ interface HomePartProps {
 }
 
 export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateToEvent, language }) => {
+  const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(true);
   const [settings, setSettings] = useState<Record<string, string>>({});
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const [featuredEvent, setFeaturedEvent] = useState<any | null>(null);
 
   const toggleMute = () => setIsMuted(!isMuted);
@@ -26,13 +26,6 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
       .then(({ data }) => {
         if (data) {
           setSettings(data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}));
-        }
-      });
-
-    supabase.from('reviews').select('*').eq('is_published', true).order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setReviews(data);
         }
       });
 
@@ -63,33 +56,43 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
       });
   }, []);
 
-  // Timer to rotate active review
-  React.useEffect(() => {
-    if (reviews.length > 1) {
-      const interval = setInterval(() => {
-        setCurrentReviewIndex((prev) => (prev + 1) % reviews.length);
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [reviews]);
+
+
+  // Helper to fallback to default (Danish) if translation is empty
+  const getTransSetting = (baseKey: string) => {
+    const langKey = language === 'da' ? baseKey : `${baseKey}_${language}`;
+    return settings[langKey] || settings[baseKey];
+  };
 
   return (
     <div className="flex flex-col bg-[#faf9f6] w-full">
       {/* Hero Section */}
       <section className="relative min-h-[600px] h-[85vh] flex flex-col items-center justify-center text-center px-4 overflow-hidden bg-[#0a0a0a] w-full">
         <div className="absolute inset-0 z-0">
-          <div
-            className="w-full h-full bg-cover bg-center transition-transform duration-[8000ms] scale-105"
-            style={{ backgroundImage: 'url(https://i.pixi.mg/i/bc4967f7161097374bbf013a.jpg)' }}
-          >
-          </div>
+          {settings.hero_video_url ? (
+            <video
+              className="w-full h-full object-cover"
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+            >
+              <source src={settings.hero_video_url} type="video/mp4" />
+            </video>
+          ) : (
+            <div
+              className="w-full h-full bg-cover bg-center transition-transform duration-[8000ms] scale-105"
+              style={{ backgroundImage: `url(${settings.hero_bg_image || 'https://i.pixi.mg/i/bc4967f7161097374bbf013a.jpg'})` }}
+            >
+            </div>
+          )}
           <div className="absolute inset-0 bg-black/55 z-10 pointer-events-none"></div>
         </div>
 
         <div className="relative z-20 max-w-7xl px-4">
-          <div className="text-[12px] md:text-[14px] tracking-[0.6em] text-[#c5a059] uppercase font-bold mb-4 md:mb-6 drop-shadow-2xl">{settings.hero_welcome || tHero.welcome}</div>
-          <h1 className="text-[54px] md:text-[100px] lg:text-[140px] font-normal serif mb-4 md:mb-6 tracking-tighter leading-none text-white drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]">{settings.hero_title || 'Bag Søjlen'}</h1>
-          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed whitespace-pre-wrap">{settings.hero_subtitle || tHero.sub}</p>
+          <div className="text-[12px] md:text-[14px] tracking-[0.6em] text-[#c5a059] uppercase font-bold mb-4 md:mb-6 drop-shadow-2xl">{getTransSetting('hero_welcome') || tHero.welcome}</div>
+          <h1 className="text-[54px] md:text-[100px] lg:text-[140px] font-normal serif mb-4 md:mb-6 tracking-tighter leading-none text-white drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]">{getTransSetting('hero_title') || 'Bag Søjlen'}</h1>
+          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed whitespace-pre-wrap">{getTransSetting('hero_subtitle') || tHero.sub}</p>
 
           <div className="mb-10 md:mb-14 text-[10px] md:text-[11px] tracking-[0.3em] md:tracking-[0.4em] font-bold uppercase text-white/70 flex flex-wrap justify-center items-center gap-x-8 md:gap-x-12 gap-y-3">
             <span className="whitespace-nowrap">{language === 'da' ? 'Tir - Lør' : language === 'en' ? 'Tue - Sat' : 'Die - Sam'}: 17.00 - 22.00</span>
@@ -104,13 +107,13 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
               onClick={onBookingStart}
               className="bg-white text-black px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-[#c5a059] hover:text-white transition-all shadow-2xl w-full sm:w-auto"
             >
-              {settings.hero_btn_book || tHero.book}
+              {getTransSetting('hero_btn_book') || tHero.book}
             </button>
             <button
               onClick={() => document.getElementById('menu-section')?.scrollIntoView({ behavior: 'smooth' })}
               className="border-[2px] md:border-[3px] border-white/60 bg-white/5 backdrop-blur-md text-white px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-white hover:text-black transition-all w-full sm:w-auto"
             >
-              {settings.hero_btn_menu || tHero.seeMenu}
+              {getTransSetting('hero_btn_menu') || tHero.seeMenu}
             </button>
           </div>
         </div>
@@ -176,102 +179,36 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
         </div>
       </section>
 
-      {/* Quote Section */}
-      <section className="py-20 md:py-32 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 text-[#1a1a1a]">
-          <span className="text-4xl md:text-6xl serif text-[#CDA235]/10 block mb-6 md:mb-10 select-none opacity-50">“</span>
-
-          <div className="relative min-h-[140px] md:min-h-[100px] flex items-center justify-center">
-            {reviews.length > 0 ? (
-              <div key={currentReviewIndex} className="animate-in fade-in slide-in-from-right-4 duration-700 absolute w-full inset-0 flex flex-col items-center justify-center">
-                <div className="flex gap-1 mb-4 md:mb-6">
-                  {[...Array(5)].map((_, i) => (
-                    <span key={i} className={`text-sm md:text-base ${(reviews[currentReviewIndex].rating || 5) > i ? 'text-[#CDA235]' : 'text-gray-200'}`}>
-                      ★
-                    </span>
-                  ))}
-                </div>
-                <h2 className="text-xl md:text-2xl lg:text-3xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
-                  "{reviews[currentReviewIndex].content}"
-                </h2>
-                <div className="flex flex-col items-center gap-3">
-                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{reviews[currentReviewIndex].author_name}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="w-full flex flex-col items-center justify-center">
-                <div className="flex gap-1 mb-4 md:mb-6">
-                  {[...Array(5)].map((_, i) => (
-                    <span key={i} className="text-sm md:text-base text-[#CDA235]">★</span>
-                  ))}
-                </div>
-                <h2 className="text-xl md:text-2xl lg:text-3xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
-                  {language === 'da' ? "En helt igennem fantastisk oplevelse. Maden var udsøgt, og atmosfæren var perfekt til vores jubilæum." : language === 'en' ? "A completely fantastic experience. The food was exquisite, and the atmosphere was perfect for our anniversary." : "Ein absolut fantastisches Erlebnis. Das Essen war exquisit und die Atmosphäre war perfekt für unser Jubiläum."}
-                </h2>
-                <div className="flex flex-col items-center gap-3">
-                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{language === 'da' ? "ANNE JENSEN" : "ANNA JOHNSON"}</span>
-                  <div className="w-8 h-px bg-gray-200"></div>
-                  <span className="text-[9px] text-gray-300 block font-bold tracking-[0.2em] uppercase">{language === 'da' ? "OKTOBER 2024" : "OCTOBER 2024"}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Carousel Indicators */}
-          {reviews.length > 1 && (
-            <div className="flex justify-center gap-2 mt-20">
-              {reviews.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentReviewIndex(i)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${i === currentReviewIndex ? 'bg-[#CDA235] w-6' : 'bg-gray-200 hover:bg-gray-300'}`}
-                  aria-label={`Go to slide ${i + 1}`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Featured Event / History Section */}
-      <section id="history-section" className="px-6 md:px-20 py-0 grid lg:grid-cols-2 gap-0 items-stretch max-w-[1440px] mx-auto w-full pb-20 md:pb-32">
-        <div className="p-8 md:p-14 lg:p-20 xl:p-24 z-20 relative bg-white border border-[#f2f1ed] shadow-[20px_20px_40px_rgba(0,0,0,0.02)] flex flex-col justify-center text-left">
-          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-8">
-            {featuredEvent ? (featuredEvent.details?.top_tag || (language === 'da' ? 'BEGIVENHED' : 'FEATURED EVENT')) : tHist.tag}
+      {/* Our History Section */}
+      <section id="history-section" className="grid lg:grid-cols-2 items-stretch max-w-[1440px] mx-auto w-full bg-[#FAF9F6] border-y border-[#f2f1ed]">
+        <div className="p-12 md:p-20 lg:p-24 z-20 relative flex flex-col justify-center text-left bg-white">
+          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-6">
+            {getTransSetting('history_tag') || tHist.tag}
           </span>
-          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none">
-            {featuredEvent ? featuredEvent.title : tHist.title}
+          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-8 text-[#1a1a1a] tracking-tighter leading-tight font-light">
+            {getTransSetting('history_title') || tHist.title}
           </h2>
-          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl pointer-events-auto">
-            <p>{featuredEvent ? (featuredEvent.description || featuredEvent.details?.paragraph_1) : tHist.text1}</p>
-            {featuredEvent ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onNavigateToEvent) {
-                    onNavigateToEvent(featuredEvent.id);
-                  }
-                }}
-                className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start cursor-pointer"
-              >
-                {language === 'da' ? 'LÆS MERE' : 'READ MORE'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start"
-              >
-                {tHist.readMore}
-              </button>
-            )}
+          <div className="text-[14px] md:text-[15px] text-gray-500 leading-relaxed font-light max-w-xl">
+            <p className="mb-0">{getTransSetting('history_text1') || tHist.text1}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              const defaultSearchLink = language === 'da' ? '/vores-historie' : language === 'de' ? '/unsere-geschichte' : '/our-history';
+              const link = getTransSetting('history_link_url') || defaultSearchLink;
+              if (link) navigate(link);
+            }}
+            className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/30 pb-2 hover:border-[#CDA235] transition-all mt-10 md:mt-12 inline-block self-start cursor-pointer"
+          >
+            {getTransSetting('history_readMore') || tHist.readMore}
+          </button>
         </div>
-        <div className="relative group overflow-hidden z-10 shadow-[20px_20px_40px_rgba(0,0,0,0.1)] min-h-[350px] md:min-h-[500px] lg:min-h-[700px]">
+        
+        <div className="relative min-h-[400px] md:min-h-[500px] lg:min-h-[auto] w-full overflow-hidden bg-gray-100">
           <div
-            className="absolute inset-0 img-cover grayscale-[0.2] brightness-75 transition-all hover:grayscale-0 hover:brightness-100 duration-1000 group-hover:scale-105"
-            style={{ backgroundImage: `url(${featuredEvent ? (featuredEvent.image_url || 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg') : 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg'})` }}
+            className="absolute inset-0 img-cover transition-transform duration-[8000ms] hover:scale-105 saturate-50"
+            style={{ backgroundImage: `url(${getTransSetting('history_image_url') || 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg'})` }}
           ></div>
-          <div className="absolute inset-0 bg-gradient-to-l from-black/20 via-transparent to-transparent pointer-events-none"></div>
         </div>
       </section>
     </div>
@@ -553,15 +490,39 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
   const tConf = translations[language].confirmation;
 
   const [reviews, setReviews] = useState<any[]>([]);
+  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const [events, setEvents] = useState<any[]>([]);
+  const [settings, setSettings] = useState<Record<string, string>>({});
 
   React.useEffect(() => {
-    supabase.from('reviews').select('*').eq('is_published', true).order('rating', { ascending: false }).limit(3)
+    supabase.from('reviews').select('*').eq('is_published', true).order('created_at', { ascending: false })
       .then(({ data }) => setReviews(data || []));
 
     supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(3)
       .then(({ data }) => setEvents(data || []));
+
+    supabase.from('settings').select('*')
+      .then(({ data }) => {
+        if (data) {
+          setSettings(data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}));
+        }
+      });
   }, []);
+
+  const getTransSetting = (baseKey: string) => {
+    const langKey = language === 'da' ? baseKey : `${baseKey}_${language}`;
+    return settings[langKey] || settings[baseKey];
+  };
+
+  // Timer to rotate active review
+  React.useEffect(() => {
+    if (reviews.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentReviewIndex((prev) => (prev + 1) % reviews.length);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [reviews]);
 
   const [bookingStep, setBookingStep] = useState<'initial' | 'time' | 'details' | 'success'>('initial');
   const [bookingData, setBookingData] = useState<BookingData>({
@@ -931,21 +892,64 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
         <div className="absolute inset-0 bg-black/80 z-10 pointer-events-none"></div>
 
         <div className="relative z-20 max-w-7xl mx-auto flex flex-col items-center px-4">
-          <span className="text-[#CDA235] text-[14px] md:text-[16px] tracking-[0.4em] md:tracking-[0.6em] uppercase font-bold block mb-6 md:mb-10 drop-shadow-lg">{tEv.tag}</span>
-          <h2 className="text-[40px] md:text-[70px] lg:text-[90px] serif mb-8 md:mb-12 italic font-light tracking-tighter leading-none text-white/95">{tEv.title}</h2>
+          <span className="text-[#CDA235] text-[14px] md:text-[16px] tracking-[0.4em] md:tracking-[0.6em] uppercase font-bold block mb-6 md:mb-10 drop-shadow-lg">{getTransSetting('events_tag') || tEv.tag}</span>
+          <h2 className="text-[40px] md:text-[70px] lg:text-[90px] serif mb-8 md:mb-12 italic font-light tracking-tighter leading-none text-white/95">{getTransSetting('events_title') || tEv.title}</h2>
           <p className="text-gray-300 text-base md:text-xl mb-12 md:mb-20 max-w-4xl mx-auto leading-relaxed font-light text-center">
-            {tEv.sub}
+            {getTransSetting('events_sub') || tEv.sub}
           </p>
 
           <div className="relative z-20 inline-block border border-[#CDA235]/30 p-10 md:p-16 lg:p-24 bg-white/5 backdrop-blur-2xl shadow-[0_40px_80px_rgba(0,0,0,0.6)] text-center w-full max-w-4xl">
-            <span className="text-[10px] md:text-[11px] tracking-[0.3em] md:tracking-[0.5em] text-[#CDA235] uppercase font-bold block mb-6 md:mb-10">{tEv.contactForOffer}</span>
+            <span className="text-[10px] md:text-[11px] tracking-[0.3em] md:tracking-[0.5em] text-[#CDA235] uppercase font-bold block mb-6 md:mb-10">{getTransSetting('events_contact') || tEv.contactForOffer}</span>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 md:gap-10 mb-6 md:mb-8">
               <span className="text-3xl md:text-4xl opacity-35 text-[#CDA235]">📞</span>
-              <span className="text-5xl md:text-6xl lg:text-7xl font-thin tracking-tighter text-white font-sans leading-none">8637 3500</span>
+              <span className="text-5xl md:text-6xl lg:text-7xl font-thin tracking-tighter text-white font-sans leading-none">{settings['events_phone'] || '8637 3500'}</span>
             </div>
-            <p className="text-[11px] md:text-[13px] tracking-[0.3em] md:tracking-[0.5em] text-gray-400 font-bold uppercase mt-8 md:mt-10 mb-6 md:mb-10 max-w-xl mx-auto">{tEv.localText}</p>
-            <p className="text-[10px] md:text-[11px] tracking-[0.2em] text-gray-500 font-black uppercase max-w-xl mx-auto">{tEv.finalText}</p>
+            <p className="text-[11px] md:text-[13px] tracking-[0.3em] md:tracking-[0.5em] text-gray-400 font-bold uppercase mt-8 md:mt-10 mb-6 md:mb-10 max-w-xl mx-auto">{getTransSetting('events_localText') || tEv.localText}</p>
+            <p className="text-[10px] md:text-[11px] tracking-[0.2em] text-gray-500 font-black uppercase max-w-xl mx-auto">{getTransSetting('events_finalText') || tEv.finalText}</p>
           </div>
+        </div>
+      </section>
+
+      {/* Quote Section */}
+      <section className="pb-20 md:pb-32 pt-10 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
+        <div className="max-w-4xl mx-auto px-4 text-[#1a1a1a]">
+          <span className="text-4xl md:text-6xl serif text-[#CDA235]/10 block mb-6 md:mb-10 select-none opacity-50">“</span>
+
+          <div className="relative min-h-[140px] md:min-h-[100px] flex items-center justify-center">
+            {reviews.length > 0 ? (
+              <div key={currentReviewIndex} className="animate-in fade-in slide-in-from-right-4 duration-700 absolute w-full inset-0 flex flex-col items-center justify-center">
+                <h2 className="text-lg md:text-xl lg:text-2xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
+                  "{language === 'da' ? reviews[currentReviewIndex].content : (reviews[currentReviewIndex][`content_${language}`] || reviews[currentReviewIndex].content)}"
+                </h2>
+                <div className="flex flex-col items-center gap-3">
+                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{reviews[currentReviewIndex].author_name}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full flex flex-col items-center justify-center">
+                <h2 className="text-lg md:text-xl lg:text-2xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
+                  {translations[language].philosophy.quote}
+                </h2>
+                <div className="flex flex-col items-center gap-3">
+                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{language === 'da' ? "BAG SØJLEN" : "BAG SØJLEN"}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Carousel Indicators */}
+          {reviews.length > 1 && (
+            <div className="flex justify-center gap-2 mt-20">
+              {reviews.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentReviewIndex(i)}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${i === currentReviewIndex ? 'bg-[#CDA235] w-6' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -974,7 +978,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
               </div>
               <span className="text-[9px] md:text-[10px] font-bold text-[#CDA235] tracking-[0.2em] block mb-4 uppercase">{event.start_date ? new Date(event.start_date).toLocaleDateString() : ''}</span>
               <h3 className="text-xl md:text-2xl serif mb-4 group-hover:underline underline-offset-8 transition-all leading-tight text-[#1a1a1a]">{event.title}</h3>
-              <p className="text-[13px] text-gray-500 font-light leading-relaxed">{event.description}</p>
+              <p className="text-[13px] text-gray-500 font-light leading-relaxed line-clamp-3">{event.details?.paragraph_1 || event.description}</p>
             </div>
           )) : (
             [
@@ -995,7 +999,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                 </div>
                 <span className="text-[9px] md:text-[10px] font-bold text-[#CDA235] tracking-[0.2em] block mb-4 uppercase">{article.date}</span>
                 <h3 className="text-xl md:text-2xl serif mb-4 group-hover:underline underline-offset-8 transition-all leading-tight text-[#1a1a1a]">{article.title}</h3>
-                <p className="text-[13px] text-gray-500 font-light leading-relaxed">{article.desc}</p>
+                <p className="text-[13px] text-gray-500 font-light leading-relaxed line-clamp-3">{article.desc}</p>
               </div>
             ))
           )}
