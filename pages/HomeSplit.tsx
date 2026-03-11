@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookingData } from '../types';
 import { Language, translations } from '../translations';
@@ -13,10 +13,22 @@ interface HomePartProps {
 export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateToEvent, language }) => {
   const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [featuredEvent, setFeaturedEvent] = useState<any | null>(null);
 
   const toggleMute = () => setIsMuted(!isMuted);
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
   const tHero = translations[language].hero;
   const tPhil = translations[language].philosophy;
   const tHist = translations[language].history;
@@ -71,6 +83,7 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
         <div className="absolute inset-0 z-0">
           {settings.hero_video_url ? (
             <video
+              ref={videoRef}
               className="w-full h-full object-cover"
               autoPlay
               loop
@@ -120,6 +133,24 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
 
         <div className="absolute bottom-6 right-6 md:bottom-12 md:right-12 z-30 flex items-center gap-4">
           <span className="hidden md:block text-[10px] tracking-[0.4em] text-white uppercase font-bold opacity-40">{tHero.sound} {isMuted ? (language === 'da' ? 'FRA' : 'OFF') : (language === 'da' ? 'TIL' : 'ON')}</span>
+          
+          <button
+            onClick={togglePlay}
+            title={isPlaying ? "Pause Video" : "Play Video"}
+            className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/20 backdrop-blur-xl flex items-center justify-center text-white hover:border-[#c5a059] hover:text-[#c5a059] transition-all bg-white/10 group shadow-2xl"
+          >
+            {isPlaying ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+            )}
+          </button>
+
           <button
             onClick={toggleMute}
             className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/20 backdrop-blur-xl flex items-center justify-center text-white hover:border-[#c5a059] hover:text-[#c5a059] transition-all bg-white/10 group shadow-2xl"

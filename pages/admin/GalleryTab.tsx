@@ -11,7 +11,8 @@ export const GalleryTab: React.FC = () => {
     const [uploadingImage, setUploadingImage] = useState(false);
 
     const [settings, setSettings] = useState<Record<string, string>>({
-        hero_bg_image: '', hero_video_url: '', philosophy_img: '', seasonal_img: ''
+        hero_bg_image: '', hero_video_url: '', philosophy_img: '', seasonal_img: '', header_logo: '', footer_logo: '',
+        header_logo_size: '64', footer_logo_size: '56'
     });
     const [savingSettings, setSavingSettings] = useState(false);
 
@@ -61,7 +62,7 @@ export const GalleryTab: React.FC = () => {
         }
 
         setSavingSettings(true);
-        const toUpdate = ['hero_bg_image', 'hero_video_url', 'philosophy_img', 'seasonal_img'];
+        const toUpdate = ['hero_bg_image', 'hero_video_url', 'philosophy_img', 'seasonal_img', 'header_logo', 'footer_logo', 'header_logo_size', 'footer_logo_size'];
         try {
             const upsertData = toUpdate
                 .filter(key => settings[key] !== undefined && settings[key] !== null)
@@ -293,6 +294,57 @@ export const GalleryTab: React.FC = () => {
                                     </div>
                                 </div>
                                 <p className="text-xs text-gray-400 mt-2 font-light">Upload an mp4 video or provide a direct video link. (YouTube links are not supported).</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-4">Header Logo</label>
+                                <div className="flex items-center gap-6">
+                                    <div className="w-24 h-24 bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                        {settings.header_logo ? <img src={settings.header_logo} alt="Header Preview" className="w-full h-full object-contain p-2" crossOrigin="anonymous" /> : <span className="text-gray-300 text-[10px] uppercase font-bold">NONE</span>}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex flex-col gap-4">
+                                            <div>
+                                                <label className="cursor-pointer bg-[#1a1a1a] text-white px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] inline-block hover:bg-[#CDA235] transition-colors">
+                                                    Upload Image <input type="file" accept="image/*" onChange={(e) => handleSettingImageUpload(e, 'header_logo')} className="hidden" />
+                                                </label>
+                                                <input type="text" value={settings.header_logo || ''} onChange={(e) => setSettings({ ...settings, header_logo: e.target.value })} className="w-full mt-2 text-sm border-b border-gray-200 py-2 focus:outline-none focus:border-[#CDA235]" placeholder="Or Image URL..." />
+                                            </div>
+                                            <div className="bg-gray-50 p-3 flexflex-col gap-2 border border-gray-100">
+                                                <div className="flex justify-between items-center w-full">
+                                                    <label className="text-[10px] uppercase font-bold text-gray-500">Logo Size (Height px)</label>
+                                                    <input type="number" min="20" max="200" value={settings.header_logo_size || '64'} onChange={(e) => setSettings({ ...settings, header_logo_size: e.target.value })} className="w-16 p-1 border border-gray-200 text-xs text-center focus:outline-none focus:border-[#CDA235]" />
+                                                </div>
+                                                <input type="range" min="20" max="200" value={settings.header_logo_size || '64'} onChange={(e) => setSettings({ ...settings, header_logo_size: e.target.value })} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-4">Footer Logo</label>
+                                <div className="flex items-center gap-6">
+                                    <div className="w-24 h-24 bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden">
+                                        {settings.footer_logo ? <img src={settings.footer_logo} alt="Footer Preview" className="w-full h-full object-contain p-2" crossOrigin="anonymous" /> : <span className="text-gray-300 text-[10px] uppercase font-bold">NONE</span>}
+                                    </div>
+                                    <div className="flex-1">
+                                         <div className="flex flex-col gap-4">
+                                            <div>
+                                                <label className="cursor-pointer bg-[#1a1a1a] text-white px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] inline-block hover:bg-[#CDA235] transition-colors">
+                                                    Upload Image <input type="file" accept="image/*" onChange={(e) => handleSettingImageUpload(e, 'footer_logo')} className="hidden" />
+                                                </label>
+                                                <input type="text" value={settings.footer_logo || ''} onChange={(e) => setSettings({ ...settings, footer_logo: e.target.value })} className="w-full mt-2 text-sm border-b border-gray-200 py-2 focus:outline-none focus:border-[#CDA235]" placeholder="Or Image URL..." />
+                                            </div>
+                                            <div className="bg-gray-50 p-3 flexflex-col gap-2 border border-gray-100">
+                                                <div className="flex justify-between items-center w-full">
+                                                    <label className="text-[10px] uppercase font-bold text-gray-500">Logo Size (Height px)</label>
+                                                    <input type="number" min="20" max="200" value={settings.footer_logo_size || '56'} onChange={(e) => setSettings({ ...settings, footer_logo_size: e.target.value })} className="w-16 p-1 border border-gray-200 text-xs text-center focus:outline-none focus:border-[#CDA235]" />
+                                                </div>
+                                                <input type="range" min="20" max="200" value={settings.footer_logo_size || '56'} onChange={(e) => setSettings({ ...settings, footer_logo_size: e.target.value })} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

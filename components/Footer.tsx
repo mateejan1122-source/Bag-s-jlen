@@ -37,11 +37,12 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
       });
   }, []);
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!email || !email.includes('@')) return;
     setStatus('loading');
     try {
-      const { error } = await supabase.from('newsletter_subscribers').insert([{ email }]);
+      const { error } = await supabase.from('newsletter_subscribers').insert([{ email, language }]);
       if (error && error.code !== '23505') throw error;
       setStatus('success');
       setEmail('');
@@ -57,7 +58,7 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
       <div className="flex flex-col items-center mb-16 md:mb-24 text-center">
         <h3 className={`text-3xl md:text-5xl serif italic mb-6 font-light text-[#CDA235]`}>{t.newsletter}</h3>
         <p className="text-gray-400 text-[12px] md:text-[13px] mb-8 md:mb-12 tracking-wide font-light max-w-lg leading-relaxed">{t.newsletterSub}</p>
-        <div className="flex flex-col sm:flex-row w-full max-w-xl gap-4 sm:gap-0">
+        <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row w-full max-w-xl gap-4 sm:gap-0">
           <input
             type="email"
             value={email}
@@ -67,14 +68,14 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
             className="bg-transparent flex-1 px-8 py-4 md:py-5 text-sm border border-white/10 text-gray-200 focus:outline-none focus:border-[#CDA235] transition-colors disabled:opacity-50"
           />
           <button
-            onClick={handleSubscribe}
+            type="submit"
             disabled={status === 'loading' || status === 'success'}
             style={{ backgroundColor: brandGold }}
             className="text-white px-12 py-4 md:py-5 text-[11px] font-bold uppercase tracking-widest sm:ml-4 hover:opacity-90 transition-all shadow-xl disabled:opacity-50"
           >
             {status === 'loading' ? '...' : status === 'success' ? '✓' : t.subscribe}
           </button>
-        </div>
+        </form>
         {status === 'success' && <p className="text-[#CDA235] mt-4 text-[11px] uppercase tracking-widest font-bold">Tak for din tilmelding! / Thank you!</p>}
         {status === 'error' && <p className="text-red-400 mt-4 text-[11px] uppercase tracking-widest font-bold">Der opstod en fejl. / An error occurred.</p>}
       </div>
@@ -85,11 +86,14 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
         <div className="flex flex-col gap-8 text-center md:text-left items-center md:items-start">
           <div className="flex justify-start">
             <img
-              src="https://files.catbox.moe/qef8ix.svg"
+              src={settings.footer_logo || "https://files.catbox.moe/qef8ix.svg"}
               alt="Bag Søjlen Logo"
               crossOrigin="anonymous"
-              style={{ filter: 'invert(100%)' }}
-              className="h-12 md:h-14 w-auto object-contain"
+              style={{
+                filter: settings.footer_logo ? 'none' : 'invert(100%)',
+                height: settings.footer_logo_size ? `${settings.footer_logo_size}px` : undefined
+              }}
+              className={`${!settings.footer_logo_size ? 'h-12 md:h-14' : ''} w-auto object-contain transition-all duration-300`}
             />
           </div>
           <p className="text-gray-500 text-[14px] leading-relaxed max-w-[320px] font-light">

@@ -15,6 +15,8 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [headerPages, setHeaderPages] = useState<any[]>([]);
+  const [headerLogo, setHeaderLogo] = useState<string | null>(null);
+  const [headerLogoSize, setHeaderLogoSize] = useState<string | null>(null);
   const t = translations[language].nav;
 
   React.useEffect(() => {
@@ -25,6 +27,22 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (data) setHeaderPages(data);
+      });
+
+    supabase.from('settings')
+      .select('value')
+      .eq('key', 'header_logo')
+      .single()
+      .then(({ data }) => {
+        if (data && data.value) setHeaderLogo(data.value);
+      });
+
+    supabase.from('settings')
+      .select('value')
+      .eq('key', 'header_logo_size')
+      .single()
+      .then(({ data }) => {
+        if (data && data.value) setHeaderLogoSize(data.value);
       });
   }, []);
 
@@ -49,11 +67,14 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
             className="flex items-center justify-center transition-transform hover:scale-105"
           >
             <img
-              src="https://files.catbox.moe/qef8ix.svg"
+              src={headerLogo || "https://files.catbox.moe/qef8ix.svg"}
               alt="Bag Søjlen Logo"
               crossOrigin="anonymous"
-              style={{ filter: 'invert(100%)' }}
-              className="h-10 md:h-16 w-auto object-contain"
+              style={{
+                filter: headerLogo ? 'none' : 'invert(100%)',
+                height: headerLogoSize ? `${headerLogoSize}px` : undefined
+              }}
+              className={`${!headerLogoSize ? 'h-10 md:h-16' : ''} w-auto object-contain transition-all duration-300`}
             />
           </button>
         </div>
