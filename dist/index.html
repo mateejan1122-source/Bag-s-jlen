@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="da">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bag Søjlen - Gastronomi i Rønde</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --color-cream: #faf9f6;
+      --color-gold: #c5a059;
+      --color-gold-hover: #b48f4a;
+      --color-black: #000000;
+      --color-dark-grey: #1a1a1a;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--color-cream);
+      color: var(--color-dark-grey);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      scroll-behavior: smooth;
+    }
+
+    h1,
+    h2,
+    h3,
+    .serif {
+      font-family: 'Playfair Display', serif;
+    }
+
+    .img-cover {
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    input,
+    textarea,
+    button {
+      border-radius: 0 !important;
+    }
+
+    .btn-gold {
+      background-color: var(--color-gold);
+      color: white;
+      transition: all 0.3s ease;
+    }
+
+    .btn-gold:hover {
+      background-color: var(--color-gold-hover);
+      transform: translateY(-2px);
+    }
+
+    .btn-outline-gold {
+      border: 1px solid var(--color-gold);
+      color: var(--color-gold);
+      transition: all 0.3s ease;
+    }
+
+    .btn-outline-gold:hover {
+      background-color: var(--color-gold);
+      color: white;
+    }
+
+    @media print {
+      .no-print {
+        display: none;
+      }
+    }
+
+    /* Dynamic Content Formatting for WYSIWYG and frontend pages */
+    .dynamic-content h1,
+    .dynamic-content h2,
+    .dynamic-content h3,
+    .dynamic-content h4 {
+      font-family: 'Playfair Display', serif !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.05em !important;
+      color: #CDA235 !important;
+      margin-top: 2rem !important;
+      margin-bottom: 1rem !important;
+      font-size: 1.15rem !important;
+    }
+
+    .dynamic-content p,
+    .dynamic-content div,
+    .dynamic-content span {
+      margin-bottom: 1.25rem;
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 300 !important;
+      color: #4b5563 !important;
+      line-height: 1.625 !important;
+      font-size: 0.95rem !important;
+    }
+
+    .dynamic-content ul {
+      list-style-type: disc !important;
+      list-style-position: outside !important;
+      margin-left: 1.125rem !important;
+      margin-bottom: 1.25rem !important;
+      color: #4b5563 !important;
+    }
+
+    .dynamic-content li {
+      margin-bottom: 0.5rem !important;
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 300 !important;
+      color: #4b5563 !important;
+      line-height: 1.625 !important;
+      font-size: 0.95rem !important;
+    }
+
+    .dynamic-content b,
+    .dynamic-content strong {
+      font-weight: 600 !important;
+      color: #4b5563 !important;
+    }
+
+    .dynamic-content em,
+    .dynamic-content i {
+      font-style: italic !important;
+    }
+
+    /* Make sure the editor itself doesn't override */
+    .rsw-editor {
+      color: #4b5563 !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+  </style>
+
+  <link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-COuD0Cwo.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>

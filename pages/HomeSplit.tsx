@@ -68,6 +68,17 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
       });
   }, []);
 
+  // Force video play when hero_video_url is loaded (Chrome blocks autoPlay on dynamic sources)
+  React.useEffect(() => {
+    if (settings.hero_video_url && videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(() => {
+        // Autoplay blocked by browser policy - user must interact first
+        setIsPlaying(false);
+      });
+    }
+  }, [settings.hero_video_url]);
+
 
 
   // Helper to fallback to default (Danish) if translation is empty
