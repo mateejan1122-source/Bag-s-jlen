@@ -14,6 +14,7 @@ import { DynamicPage } from './pages/DynamicPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { BookingData } from './types';
 import { Language, translations } from './translations';
+import { ChatWidget } from './components/ChatWidget';
 interface AllergyModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -155,6 +156,11 @@ const App: React.FC = () => {
 
         {!location.pathname.startsWith('/admin') && (
           <Footer language={language} />
+        )}
+
+        {/* Global Chat Widget */}
+        {!location.pathname.startsWith('/admin') && (
+          <ChatWidget language={language} />
         )}
       </div>
     </>

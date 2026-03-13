@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Language } from '../translations';
-import { LayoutDashboard, FileText, Type, Settings, LogOut, Menu, X, Trash2, Edit3, Plus, Globe, Coffee, Calendar, Image as ImageIcon, Users, Send } from 'lucide-react';
+import { LayoutDashboard, FileText, Type, Settings, LogOut, Menu, X, Trash2, Edit3, Plus, Globe, Coffee, Calendar, Image as ImageIcon, Users, Send, Mail, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { ReservationsTab } from './admin/ReservationsTab';
@@ -14,8 +14,12 @@ import { GalleryTab } from './admin/GalleryTab';
 import { MarketingTab } from './admin/MarketingTab';
 import { AppearanceTab } from './admin/AppearanceTab';
 import { HistoryTab } from './admin/HistoryTab';
+import { DashboardOverviewTab } from './admin/DashboardOverviewTab';
+import { NewsletterTab } from './admin/NewsletterTab';
+import { ChatTab } from './admin/ChatTab';
+import { Bell } from 'lucide-react';
 
-type AdminTab = 'reservations' | 'menu' | 'history' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'settings' | 'appearance';
+type AdminTab = 'overview' | 'reservations' | 'menu' | 'history' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'newsletter' | 'settings' | 'appearance' | 'chat';
 
 export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -27,7 +31,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<AdminTab>('reservations');
+    const [activeTab, setActiveTab] = useState<AdminTab>('overview');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const navigate = useNavigate();
 
@@ -135,17 +139,34 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
             {/* Sidebar */}
             <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block w-full md:w-[280px] bg-[#1a1a1a] text-white flex-shrink-0 min-h-[calc(100vh-80px)] relative p-8 border-r border-[#CDA235]/20 z-10 transition-all`}>
-                <div className="mb-16 pb-8 border-b border-white/10">
+                <div className="mb-16 pb-8 border-b border-white/10 relative">
                     <span className="text-[#CDA235] text-[10px] font-bold tracking-[0.4em] uppercase block mb-3">ADMINISTRATOR</span>
-                    <h2 className="text-2xl serif italic text-white">Dashboard</h2>
+                    <h2 className="text-2xl serif italic text-white flex items-center justify-between">
+                        Dashboard
+                        <button className="relative text-gray-400 hover:text-white transition-colors">
+                            <Bell size={20} />
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#CDA235] opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#CDA235]"></span>
+                            </span>
+                        </button>
+                    </h2>
                 </div>
 
                 <nav className="space-y-2">
                     <button
+                        onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'overview' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <LayoutDashboard size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Overview</span>
+                    </button>
+
+                    <button
                         onClick={() => { setActiveTab('reservations'); setIsSidebarOpen(false); }}
                         className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'reservations' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
-                        <LayoutDashboard size={18} />
+                        <Calendar size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Reservations</span>
                     </button>
 
@@ -202,7 +223,23 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                         className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'marketing' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <Users size={18} />
-                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Marketing & Reviews</span>
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Customer Reviews</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('newsletter'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'newsletter' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <Mail size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Newsletter List</span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('chat'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'chat' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <MessageSquare size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Live Chat</span>
                     </button>
 
                     {userRole === 'admin' && (
@@ -240,6 +277,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
             {/* Main Content Area */}
             <div className="flex-grow p-6 md:p-12 overflow-y-auto w-full bg-[#FAF9F6] relative z-0">
                 <div className="max-w-[1200px] mx-auto">
+                    {activeTab === 'overview' && <DashboardOverviewTab setActiveTab={setActiveTab} />}
                     {activeTab === 'reservations' && <ReservationsTab />}
                     {activeTab === 'menu' && <MenuTab />}
                     {activeTab === 'history' && <HistoryTab />}
@@ -248,6 +286,8 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     {activeTab === 'events' && <EventsTab />}
                     {activeTab === 'gallery' && <GalleryTab />}
                     {activeTab === 'marketing' && <MarketingTab />}
+                    {activeTab === 'newsletter' && <NewsletterTab />}
+                    {activeTab === 'chat' && <ChatTab />}
                     {activeTab === 'appearance' && userRole === 'admin' && <AppearanceTab />}
                     {activeTab === 'settings' && userRole === 'admin' && <SettingsTab />}
                 </div>

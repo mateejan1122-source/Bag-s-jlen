@@ -72,7 +72,8 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
               crossOrigin="anonymous"
               style={{
                 filter: headerLogo ? 'none' : 'invert(100%)',
-                height: headerLogoSize ? `${headerLogoSize}px` : undefined
+                height: headerLogoSize ? `${Math.min(Number(headerLogoSize), 120)}px` : undefined,
+                maxHeight: '120px'
               }}
               className={`${!headerLogoSize ? 'h-10 md:h-16' : ''} w-auto object-contain transition-all duration-300`}
             />

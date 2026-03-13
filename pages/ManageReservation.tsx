@@ -37,15 +37,18 @@ const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking,
         .select('*')
         .ilike('email', email.trim())
         .ilike('fullName', name.trim())
-        .neq('status', 'cancelled')
         .order('created_at', { ascending: false })
         .limit(1);
 
       if (fetchError) throw fetchError;
 
       if (data && data.length > 0) {
-        setActiveBooking(data[0]);
-        setFlow('dashboard');
+        if (data[0].status === 'cancelled') {
+           setError(language === 'da' ? 'Din reservation er allerede annulleret.' : 'Your reservation has been canceled.');
+        } else {
+           setActiveBooking(data[0]);
+           setFlow('dashboard');
+        }
       } else {
         setError(language === 'da' ? 'Ingen reservation fundet med disse oplysninger.' : 'No reservation found with these details.');
       }
@@ -95,6 +98,22 @@ const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking,
         .update({ status: 'cancelled' })
         .eq('id', activeBooking.id);
       if (cancelError) throw cancelError;
+
+      try {
+           await supabase.functions.invoke('send-booking-email', {
+               body: {
+                   type: 'cancellation',
+                   name: activeBooking.fullName,
+                   email: activeBooking.email,
+                   date: activeBooking.date,
+                   time: activeBooking.time,
+                   guests: activeBooking.guests,
+                   language: language
+               }
+           });
+      } catch (err) {
+           console.error("Failed to send customer cancellation email:", err);
+      }
 
       setSuccessType('cancel');
       setFlow('success');

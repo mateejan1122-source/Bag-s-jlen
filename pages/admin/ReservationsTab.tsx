@@ -47,6 +47,42 @@ export const ReservationsTab: React.FC = () => {
                 .eq('id', id);
 
             if (updateError) throw updateError;
+            
+            const targetBooking = bookings.find(b => b.id === id);
+            
+            if (targetBooking) {
+                 try {
+                     if (newStatus === 'cancelled' || newStatus === 'rejection') {
+                         const emailType = targetBooking.status === 'confirmed' ? 'cancellation' : 'rejection';
+                         await supabase.functions.invoke('send-booking-email', {
+                             body: {
+                                 type: emailType,
+                                 name: targetBooking.fullName,
+                                 email: targetBooking.email,
+                                 date: targetBooking.date,
+                                 time: targetBooking.time,
+                                 guests: targetBooking.guests,
+                                 language: 'da' 
+                             }
+                         });
+                     } else if (newStatus === 'confirmed') {
+                         await supabase.functions.invoke('send-booking-email', {
+                             body: {
+                                 type: 'confirmation',
+                                 name: targetBooking.fullName,
+                                 email: targetBooking.email,
+                                 date: targetBooking.date,
+                                 time: targetBooking.time,
+                                 guests: targetBooking.guests,
+                                 language: 'da' 
+                             }
+                         });
+                     }
+                 } catch (emailErr) {
+                     console.error("Failed to send automatic status email:", emailErr);
+                 }
+            }
+            
             setBookings(bookings.map(b => b.id === id ? { ...b, status: newStatus } : b));
         } catch (err) {
             console.error(err);
@@ -59,13 +95,58 @@ export const ReservationsTab: React.FC = () => {
         setLoading(true);
         try {
             if (editingBooking.id) {
+                const oldBooking = bookings.find(b => b.id === editingBooking.id);
                 const { id, ...updateData } = editingBooking;
                 const { error } = await supabase.from('bookings').update(updateData).eq('id', id);
                 if (error) throw error;
+
+                if (oldBooking && oldBooking.status !== updateData.status) {
+                     try {
+                         let emailType = '';
+                         if (updateData.status === 'confirmed') emailType = 'confirmation';
+                         else if (updateData.status === 'cancelled' || updateData.status === 'rejection') {
+                             emailType = oldBooking.status === 'confirmed' ? 'cancellation' : 'rejection';
+                         }
+                         
+                         if (emailType) {
+                             await supabase.functions.invoke('send-booking-email', {
+                                 body: {
+                                     type: emailType,
+                                     name: updateData.fullName,
+                                     email: updateData.email,
+                                     date: updateData.date,
+                                     time: updateData.time,
+                                     guests: updateData.guests,
+                                     language: 'da'
+                                 }
+                             });
+                         }
+                     } catch (err) {
+                         console.error("Failed to send status update email from edit:", err);
+                     }
+                }
             } else {
                 const { id, ...newData } = editingBooking;
                 const { error } = await supabase.from('bookings').insert([newData]);
                 if (error) throw error;
+
+                if (newData.status === 'confirmed' && newData.email) {
+                     try {
+                         await supabase.functions.invoke('send-booking-email', {
+                             body: {
+                                 type: 'confirmation',
+                                 name: newData.fullName,
+                                 email: newData.email,
+                                 date: newData.date,
+                                 time: newData.time,
+                                 guests: newData.guests,
+                                 language: 'da'
+                             }
+                         });
+                     } catch (err) {
+                         console.error("Failed to send creation confirmation email:", err);
+                     }
+                }
             }
             setIsEditing(false);
             fetchBookings();
@@ -81,6 +162,8 @@ export const ReservationsTab: React.FC = () => {
         if (!window.confirm('Are you sure you want to delete this reservation? This cannot be undone.')) return;
         setLoading(true);
         try {
+            const targetBooking = bookings.find(b => b.id === id);
+            
             // Added .select() so Supabase returns the rows that were ACTUALLY deleted.
             const { error, data } = await supabase.from('bookings').delete().eq('id', id).select();
 
@@ -95,6 +178,24 @@ export const ReservationsTab: React.FC = () => {
                 const rlsError = new Error('Row Level Security (RLS) policy blocked the deletion. Please check Supabase policies for the bookings table to allow DELETE operations.');
                 rlsError.name = 'RLSError';
                 throw rlsError;
+            }
+
+            if (targetBooking) {
+                 try {
+                     await supabase.functions.invoke('send-booking-email', {
+                         body: {
+                             type: 'cancellation',
+                             name: targetBooking.fullName,
+                             email: targetBooking.email,
+                             date: targetBooking.date,
+                             time: targetBooking.time,
+                             guests: targetBooking.guests,
+                             language: 'da'
+                         }
+                     });
+                 } catch (emailErr) {
+                     console.error("Failed to send automatic cancellation email:", emailErr);
+                 }
             }
 
             fetchBookings();

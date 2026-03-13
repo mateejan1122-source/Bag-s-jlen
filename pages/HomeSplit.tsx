@@ -68,6 +68,17 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
       });
   }, []);
 
+  // Force video play when hero_video_url is loaded (Chrome blocks autoPlay on dynamic sources)
+  React.useEffect(() => {
+    if (settings.hero_video_url && videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(() => {
+        // Autoplay blocked by browser policy - user must interact first
+        setIsPlaying(false);
+      });
+    }
+  }, [settings.hero_video_url]);
+
 
 
   // Helper to fallback to default (Danish) if translation is empty
@@ -604,11 +615,29 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
               email: bookingData.email,
               phone: bookingData.phone,
               specialRequests: bookingData.specialRequests,
-              status: 'pending'
+              status: 'confirmed'
             }
           ]);
 
         if (error) throw error;
+        
+        // Trigger the automatic confirmation email to the user
+        try {
+            await supabase.functions.invoke('send-booking-email', {
+                body: {
+                    type: 'confirmation',
+                    name: bookingData.fullName,
+                    email: bookingData.email,
+                    date: bookingData.date,
+                    time: bookingData.time,
+                    guests: bookingData.guests,
+                    language: language
+                }
+            });
+        } catch (emailErr) {
+            console.error("Failed to send automatic email:", emailErr);
+            // Non-blocking error for the user
+        }
 
         onBookingConfirmed(bookingData);
         setBookingStep('success');
