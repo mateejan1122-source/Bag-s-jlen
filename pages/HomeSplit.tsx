@@ -116,7 +116,7 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
         <div className="relative z-20 max-w-7xl px-4">
           <div className="text-[12px] md:text-[14px] tracking-[0.6em] text-[#c5a059] uppercase font-bold mb-4 md:mb-6 drop-shadow-2xl">{getTransSetting('hero_welcome') || tHero.welcome}</div>
           <h1 className="text-[54px] md:text-[100px] lg:text-[140px] font-normal serif mb-4 md:mb-6 tracking-tighter leading-none text-white drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]">{getTransSetting('hero_title') || 'Bag Søjlen'}</h1>
-          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed whitespace-pre-wrap">{getTransSetting('hero_subtitle') || tHero.sub}</p>
+          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed whitespace-pre-wrap font-light">{getTransSetting('hero_subtitle') || tHero.sub}</p>
 
           <div className="mb-10 md:mb-14 text-[10px] md:text-[11px] tracking-[0.3em] md:tracking-[0.4em] font-bold uppercase text-white/70 flex flex-wrap justify-center items-center gap-x-8 md:gap-x-12 gap-y-3">
             <span className="whitespace-nowrap">{language === 'da' ? 'Tir - Lør' : language === 'en' ? 'Tue - Sat' : 'Die - Sam'}: 17.00 - 22.00</span>
@@ -200,7 +200,7 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
           <div className="w-10 md:w-12 h-0.5 bg-[#CDA235] mb-6 md:mb-10"></div>
           <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.5em] md:tracking-[0.6em] uppercase block mb-4 md:mb-6">{tPhil.tag}</span>
           <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-10 leading-none text-[#1a1a1a] tracking-tighter">{tPhil.title}</h2>
-
+          
           <div className="relative mb-8 md:mb-12">
             <span className="absolute -top-4 -left-4 md:-top-8 md:-left-8 text-[60px] md:text-[100px] serif text-[#CDA235]/10 leading-none pointer-events-none italic font-light">“</span>
             <p className="italic serif text-gray-400 text-xl md:text-2xl lg:text-3xl leading-[1.6] relative z-10">
@@ -221,38 +221,40 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
         </div>
       </section>
 
-      {/* Our History Section */}
-      <section id="history-section" className="grid lg:grid-cols-2 items-stretch max-w-[1440px] mx-auto w-full bg-[#FAF9F6] border-y border-[#f2f1ed]">
-        <div className="p-12 md:p-20 lg:p-24 z-20 relative flex flex-col justify-center text-left bg-white">
-          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-6">
+      {/* History Section */}
+      <section id="history-section" className="px-6 md:px-20 py-0 grid lg:grid-cols-2 gap-0 items-stretch max-w-[1440px] mx-auto w-full pb-20 md:pb-32">
+        <div className="p-8 md:p-14 lg:p-20 xl:p-24 z-20 relative bg-white border border-[#f2f1ed] shadow-[20px_20px_40px_rgba(0,0,0,0.02)] flex flex-col justify-center text-left">
+          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-8">
             {getTransSetting('history_tag') || tHist.tag}
           </span>
-          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-8 text-[#1a1a1a] tracking-tighter leading-tight font-light">
+          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none">
             {getTransSetting('history_title') || tHist.title}
           </h2>
-          <div className="text-[14px] md:text-[15px] text-gray-500 leading-relaxed font-light max-w-xl">
-            <p className="mb-0">{getTransSetting('history_text1') || tHist.text1}</p>
+          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl">
+            <p>{getTransSetting('history_text1') || tHist.text1}</p>
+            <button
+              type="button"
+              onClick={() => {
+                const defaultSearchLink = language === 'da' ? '/vores-historie' : language === 'de' ? '/unsere-geschichte' : '/our-history';
+                const link = getTransSetting('history_link_url') || defaultSearchLink;
+                if (link) navigate(link);
+              }}
+              className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start cursor-pointer"
+            >
+              {getTransSetting('history_readMore') || tHist.readMore}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const defaultSearchLink = language === 'da' ? '/vores-historie' : language === 'de' ? '/unsere-geschichte' : '/our-history';
-              const link = getTransSetting('history_link_url') || defaultSearchLink;
-              if (link) navigate(link);
-            }}
-            className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/30 pb-2 hover:border-[#CDA235] transition-all mt-10 md:mt-12 inline-block self-start cursor-pointer"
-          >
-            {getTransSetting('history_readMore') || tHist.readMore}
-          </button>
         </div>
-        
-        <div className="relative min-h-[400px] md:min-h-[500px] lg:min-h-[auto] w-full overflow-hidden bg-gray-100">
+
+        <div className="relative group overflow-hidden z-10 shadow-[20px_20px_40px_rgba(0,0,0,0.1)] min-h-[350px] md:min-h-[500px] lg:min-h-[700px]">
           <div
-            className="absolute inset-0 img-cover transition-transform duration-[8000ms] hover:scale-105 saturate-50"
+            className="absolute inset-0 img-cover grayscale-[0.2] brightness-75 transition-all hover:grayscale-0 hover:brightness-100 duration-1000 group-hover:scale-105"
             style={{ backgroundImage: `url(${getTransSetting('history_image_url') || 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg'})` }}
           ></div>
+          <div className="absolute inset-0 bg-gradient-to-l from-black/20 via-transparent to-transparent pointer-events-none"></div>
         </div>
       </section>
+
     </div>
   );
 };
@@ -492,17 +494,17 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
 
               <div className="space-y-8 md:space-y-12">
                 <div className="group/course">
-                  <span className="text-[9px] md:text-[10px] font-bold tracking-[0.4em] md:tracking-[0.5em] text-[#CDA235] uppercase mb-1 block">{translations[language].menu.categories.starters}</span>
+                  <span className="text-[9px] md:text-[10px] font-bold tracking-[0.4em] md:tracking-[0.5em] text-[#CDA235] uppercase mb-1 block">{translations[language].menu.categories.starters || 'FORRETTER'}</span>
                   <h4 className="text-xl md:text-2xl serif text-[#1a1a1a] mb-1">{tSeas.starter}</h4>
                   <p className="text-[13px] md:text-[14px] text-gray-400 font-light italic leading-snug">{tSeas.starterDesc}</p>
                 </div>
                 <div className="group/course">
-                  <span className="text-[9px] md:text-[10px] font-bold tracking-[0.4em] md:tracking-[0.5em] text-[#CDA235] uppercase mb-1 block">{translations[language].menu.categories.main}</span>
+                  <span className="text-[9px] md:text-[10px] font-bold tracking-[0.4em] md:tracking-[0.5em] text-[#CDA235] uppercase mb-1 block">{translations[language].menu.categories.main || 'HOVEDRETTER'}</span>
                   <h4 className="text-xl md:text-2xl serif text-[#1a1a1a] mb-1">{tSeas.main}</h4>
                   <p className="text-[13px] md:text-[14px] text-gray-400 font-light italic leading-snug">{tSeas.mainDesc}</p>
                 </div>
                 <div className="group/course">
-                  <span className="text-[9px] md:text-[10px] font-bold tracking-[0.4em] md:tracking-[0.5em] text-[#CDA235] uppercase mb-1 block">{translations[language].menu.categories.dessert}</span>
+                  <span className="text-[9px] md:text-[10px] font-bold tracking-[0.4em] md:tracking-[0.5em] text-[#CDA235] uppercase mb-1 block">{translations[language].menu.categories.dessert || 'DESSERTTER'}</span>
                   <h4 className="text-xl md:text-2xl serif text-[#1a1a1a] mb-1">{tSeas.dessert}</h4>
                   <p className="text-[13px] md:text-[14px] text-gray-400 font-light italic leading-snug">{tSeas.dessertDesc}</p>
                 </div>
@@ -513,7 +515,7 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
                   onClick={onBookingStart}
                   className="bg-[#1a1a1a] text-white px-8 md:px-10 py-4 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] md:tracking-[0.3em] hover:bg-[#CDA235] transition-all shadow-xl w-full sm:w-auto"
                 >
-                  {tSeas.bookThis}
+                  {tSeas.bookThis || 'RESERVER BORD TIL DENNE MENU'}
                 </button>
               </div>
             </div>
@@ -971,27 +973,31 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
       </section>
 
       {/* Quote Section */}
-      <section className="pb-20 md:pb-32 pt-10 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 text-[#1a1a1a]">
-          <span className="text-4xl md:text-6xl serif text-[#CDA235]/10 block mb-6 md:mb-10 select-none opacity-50">“</span>
+      <section className="py-20 md:py-32 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto px-4 text-[#1a1a1a]">
+          <span className="text-5xl md:text-7xl serif text-[#CDA235]/10 block mb-8 md:mb-12 select-none opacity-50">“</span>
 
           <div className="relative min-h-[140px] md:min-h-[100px] flex items-center justify-center">
             {reviews.length > 0 ? (
               <div key={currentReviewIndex} className="animate-in fade-in slide-in-from-right-4 duration-700 absolute w-full inset-0 flex flex-col items-center justify-center">
-                <h2 className="text-lg md:text-xl lg:text-2xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
+                <h2 className="text-2xl md:text-4xl lg:text-5xl serif italic font-light leading-tight mb-10 md:mb-16 px-0 lg:px-10 tracking-tight">
                   "{language === 'da' ? reviews[currentReviewIndex].content : (reviews[currentReviewIndex][`content_${language}`] || reviews[currentReviewIndex].content)}"
                 </h2>
-                <div className="flex flex-col items-center gap-3">
-                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{reviews[currentReviewIndex].author_name}</span>
+                <div className="flex flex-col items-center gap-4">
+                  <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{reviews[currentReviewIndex].author_name}</span>
+                  <div className="w-10 h-px bg-gray-200"></div>
+                  <span className="text-[10px] text-gray-300 block font-bold tracking-[0.2em] uppercase">{new Date(reviews[currentReviewIndex].created_at).toLocaleDateString(language === 'da' ? 'da-DK' : 'en-US', { month: 'long', year: 'numeric' })}</span>
                 </div>
               </div>
             ) : (
               <div className="w-full flex flex-col items-center justify-center">
-                <h2 className="text-lg md:text-xl lg:text-2xl serif italic font-light leading-relaxed mb-6 md:mb-10 px-0 lg:px-10 tracking-tight text-gray-700">
+                <h2 className="text-2xl md:text-4xl lg:text-5xl serif italic font-light leading-tight mb-10 md:mb-16 px-0 lg:px-10 tracking-tight">
                   {translations[language].philosophy.quote}
                 </h2>
-                <div className="flex flex-col items-center gap-3">
-                  <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{language === 'da' ? "BAG SØJLEN" : "BAG SØJLEN"}</span>
+                <div className="flex flex-col items-center gap-4">
+                  <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">ANNE JENSEN</span>
+                  <div className="w-10 h-px bg-gray-200"></div>
+                  <span className="text-[10px] text-gray-300 block font-bold tracking-[0.2em] uppercase">OKTOBER 2024</span>
                 </div>
               </div>
             )}

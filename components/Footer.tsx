@@ -99,10 +99,10 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
                 filter: settings.footer_logo ? 'none' : 'invert(100%)',
                 height: settings.footer_logo_size ? `${settings.footer_logo_size}px` : undefined
               }}
-              className={`${!settings.footer_logo_size ? 'h-12 md:h-14' : ''} w-auto object-contain transition-all duration-300`}
+              className={`${!settings.footer_logo_size ? 'h-10 md:h-12' : ''} w-auto object-contain transition-all duration-300 opacity-80 hover:opacity-100`}
             />
           </div>
-          <p className="text-gray-500 text-[14px] leading-relaxed max-w-[320px] font-light">
+          <p className="text-gray-500 text-[13px] leading-relaxed max-w-[320px] font-light tracking-wide">
             {language === 'da' ? (settings.footer_desc || t.philosophy) : (settings[`footer_desc_${language}`] || settings.footer_desc || t.philosophy)}
           </p>
         </div>

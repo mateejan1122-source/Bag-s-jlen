@@ -7,6 +7,7 @@ export const HistoryTab: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [activeLang, setActiveLang] = useState<'da' | 'en' | 'de'>('da');
     const [isTranslating, setIsTranslating] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     // Base keys without language suffix
     const baseKeys = ['history_tag', 'history_title', 'history_text1', 'history_full_text', 'history_readMore', 'history_image_url', 'history_link_url'];
@@ -125,6 +126,35 @@ export const HistoryTab: React.FC = () => {
         }
     };
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+
+        setUploadingImage(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `history_${Math.random()}.${fileExt}`;
+            const filePath = `history/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('public-images')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('public-images')
+                .getPublicUrl(filePath);
+
+            setSettings({ ...settings, history_image_url: publicUrl });
+        } catch (err: any) {
+            console.error('Error uploading image', err.message);
+            alert('Failed to upload image. Ensure public-images bucket exists.');
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-300 max-w-3xl">
             <div className="mb-8 border-b border-[#CDA235]/20 pb-8">
@@ -236,16 +266,33 @@ export const HistoryTab: React.FC = () => {
                         <ImageIcon size={14} className="text-[#CDA235]" /> Section Image
                     </label>
                     <div className="flex gap-6 items-start">
-                        <div className="flex-1 space-y-4">
-                            <div>
-                                <input
-                                    type="url"
-                                    value={settings['history_image_url'] || ''}
-                                    onChange={(e) => setSettings({ ...settings, history_image_url: e.target.value })}
-                                    className="w-full text-sm border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors bg-transparent"
-                                    placeholder="https://example.com/image.jpg"
-                                />
-                                <p className="text-[10px] tracking-wide text-gray-400 mt-2">Paste a direct image URL. This image applies across all languages.</p>
+                        <div className="flex-1 space-y-6">
+                            <div className="flex items-center gap-6">
+                                <div className="w-48 h-32 bg-gray-50 border border-gray-200 flex flex-col items-center justify-center overflow-hidden relative">
+                                    {settings['history_image_url'] ? (
+                                        <img src={settings['history_image_url']} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <ImageIcon className="text-gray-300" size={32} />
+                                    )}
+                                    {uploadingImage && <div className="absolute inset-0 bg-white/80 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest">Uploading...</div>}
+                                </div>
+                                <div className="flex-1">
+                                    <label className="cursor-pointer bg-[#1a1a1a] text-white px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] inline-block hover:bg-[#CDA235] transition-colors">
+                                        Upload Image
+                                        <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                                    </label>
+                                    <p className="text-xs text-gray-400 mt-2">Max 5MB recommended.</p>
+                                    <div className="mt-4">
+                                        <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-1 block">Or Image URL</label>
+                                        <input
+                                            type="url"
+                                            value={settings['history_image_url'] || ''}
+                                            onChange={(e) => setSettings({ ...settings, history_image_url: e.target.value })}
+                                            className="w-full text-sm border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors bg-transparent"
+                                            placeholder="https://example.com/image.jpg"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Read More Button Destination URL / Slug</label>
@@ -259,13 +306,9 @@ export const HistoryTab: React.FC = () => {
                                 <p className="text-[10px] tracking-wide text-gray-400 mt-2">The page this button navigates to (eg. "/vores-historie").</p>
                             </div>
                         </div>
-                        {settings['history_image_url'] && (
-                            <div className="w-32 h-32 border border-gray-100 shadow-md flex-shrink-0 bg-gray-50 p-1">
-                                <img src={settings['history_image_url']} alt="History preview" className="w-full h-full object-cover" />
-                            </div>
-                        )}
                     </div>
                 </div>
+
 
                 <div className="pt-6 relative z-10">
                     <button type="submit" disabled={loading} className="w-full py-5 bg-[#1a1a1a] text-white text-[11px] uppercase font-bold tracking-[0.4em] shadow-xl hover:bg-[#CDA235] transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1">

@@ -12,7 +12,7 @@
   <style>
     :root {
       --color-cream: #faf9f6;
-      --color-gold: #c5a059;
+      --color-gold: #CDA235;
       --color-gold-hover: #b48f4a;
       --color-black: #000000;
       --color-dark-grey: #1a1a1a;
@@ -25,13 +25,16 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       scroll-behavior: smooth;
+      font-weight: 300;
     }
 
     h1,
     h2,
     h3,
+    h4,
     .serif {
       font-family: 'Playfair Display', serif;
+      font-weight: 400;
     }
 
     .img-cover {
@@ -72,6 +75,29 @@
       .no-print {
         display: none;
       }
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #faf9f6;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #e2e1dd;
+      border: 3px solid #faf9f6;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #CDA235;
+    }
+
+    ::selection {
+      background: #CDA235;
+      color: white;
     }
 
     /* Dynamic Content Formatting for WYSIWYG and frontend pages */
