@@ -5,7 +5,7 @@ import { Edit3, Trash2, Plus, Download, Search, Check, X } from 'lucide-react';
 export const ReservationsTab: React.FC = () => {
     const [bookings, setBookings] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'rejected' | 'confirmed' | 'cancelled'>('all');
 
     // New states for Advanced Features
     const [searchQuery, setSearchQuery] = useState('');
@@ -52,7 +52,7 @@ export const ReservationsTab: React.FC = () => {
             
             if (targetBooking) {
                  try {
-                     if (newStatus === 'cancelled' || newStatus === 'rejection') {
+                     if (newStatus === 'cancelled' || newStatus === 'rejected') {
                          const emailType = targetBooking.status === 'confirmed' ? 'cancellation' : 'rejection';
                          await supabase.functions.invoke('send-booking-email', {
                              body: {
@@ -104,7 +104,7 @@ export const ReservationsTab: React.FC = () => {
                      try {
                          let emailType = '';
                          if (updateData.status === 'confirmed') emailType = 'confirmation';
-                         else if (updateData.status === 'cancelled' || updateData.status === 'rejection') {
+                         else if (updateData.status === 'cancelled' || updateData.status === 'rejected') {
                              emailType = oldBooking.status === 'confirmed' ? 'cancellation' : 'rejection';
                          }
                          
@@ -301,9 +301,9 @@ export const ReservationsTab: React.FC = () => {
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Status</label>
                             <select value={editingBooking.status} onChange={e => setEditingBooking({ ...editingBooking, status: e.target.value })} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors bg-white">
-                                <option value="pending">Pending</option>
-                                <option value="confirmed">Confirmed</option>
+                            <option value="confirmed">Confirmed</option>
                                 <option value="cancelled">Cancelled</option>
+                                <option value="rejected">Rejected</option>
                             </select>
                         </div>
                     </div>
@@ -366,7 +366,7 @@ export const ReservationsTab: React.FC = () => {
                         </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {(['all', 'pending', 'confirmed', 'cancelled'] as const).map(filter => (
+                        {(['all', 'confirmed', 'rejected', 'cancelled'] as const).map(filter => (
                             <button
                                 type="button"
                                 key={filter}
@@ -441,14 +441,51 @@ export const ReservationsTab: React.FC = () => {
                                                     <button type="button" onClick={() => updateStatus(booking.id, 'confirmed')} className="w-8 h-8 flex items-center justify-center bg-[#CDA235]/10 text-[#CDA235] hover:bg-[#CDA235] hover:text-white transition-all rounded-full" title="Confirm">
                                                         ✓
                                                     </button>
-                                                    <button type="button" onClick={() => updateStatus(booking.id, 'cancelled')} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-full" title="Cancel">
+                                                    <button type="button" onClick={() => updateStatus(booking.id, 'rejected')} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-full" title="Reject">
                                                         ✕
                                                     </button>
                                                 </>
                                             ) : booking.status === 'confirmed' ? (
-                                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#CDA235] border border-[#CDA235]/30 px-3 py-1 bg-[#CDA235]/5">
-                                                    Confirmed
-                                                </span>
+                                                <>
+                                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#CDA235] border border-[#CDA235]/30 px-3 py-1 bg-[#CDA235]/5">
+                                                        Confirmed
+                                                    </span>
+                                                    <button type="button" onClick={() => updateStatus(booking.id, 'cancelled')} className="text-[9px] font-bold uppercase tracking-widest text-red-400 hover:text-red-600 transition-colors ml-2" title="Cancel">
+                                                        Cancel
+                                                    </button>
+                                                </>
+                                            ) : booking.status === 'rejected' ? (
+                                                <div className="flex flex-col items-center gap-1.5">
+                                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-500 border border-orange-100 px-3 py-1 bg-orange-50">
+                                                        Rejected
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        title="Send re-invite email when a table becomes available"
+                                                        onClick={async () => {
+                                                            if (!window.confirm(`Send a re-invite email to ${booking.email}?`)) return;
+                                                            try {
+                                                                await supabase.functions.invoke('send-booking-email', {
+                                                                    body: {
+                                                                        type: 'rejection',
+                                                                        name: booking.fullName,
+                                                                        email: booking.email,
+                                                                        date: booking.date,
+                                                                        time: booking.time,
+                                                                        guests: booking.guests,
+                                                                        language: 'da'
+                                                                    }
+                                                                });
+                                                                alert('Re-invite email sent!');
+                                                            } catch (err) {
+                                                                alert('Failed to send email');
+                                                            }
+                                                        }}
+                                                        className="text-[9px] font-bold uppercase tracking-widest text-blue-500 hover:text-blue-700 transition-colors"
+                                                    >
+                                                        ✉ Re-invite
+                                                    </button>
+                                                </div>
                                             ) : (
                                                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-400 border border-red-100 px-3 py-1 bg-red-50">
                                                     Cancelled

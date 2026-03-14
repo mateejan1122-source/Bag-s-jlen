@@ -171,6 +171,14 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     </button>
 
                     <button
+                        onClick={() => { setActiveTab('chat'); setIsSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'chat' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                        <MessageSquare size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Live Chat</span>
+                    </button>
+
+                    <button
                         onClick={() => { setActiveTab('menu'); setIsSidebarOpen(false); }}
                         className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'menu' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
@@ -234,14 +242,6 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Newsletter List</span>
                     </button>
 
-                    <button
-                        onClick={() => { setActiveTab('chat'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'chat' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                    >
-                        <MessageSquare size={18} />
-                        <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Live Chat</span>
-                    </button>
-
                     {userRole === 'admin' && (
                         <>
                             <button
@@ -263,7 +263,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                 </nav>
 
                 <div className="absolute bottom-8 left-8 right-8 space-y-4">
-                    <button onClick={() => navigate('/')} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-white transition-colors border border-white/10 hover:border-white/30">
+                    <button onClick={() => window.open('/', '_blank')} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-white transition-colors border border-white/10 hover:border-white/30">
                         <Globe size={18} />
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">View Site</span>
                     </button>
