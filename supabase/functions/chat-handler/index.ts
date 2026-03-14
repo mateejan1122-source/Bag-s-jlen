@@ -76,8 +76,8 @@ serve(async (req) => {
             await supabase.from('chat_messages').insert({ session_id, sender: 'user', content: user_message });
         }
 
-        // 3. Prepare Chat Context
-        const { data: history } = await supabase.from('chat_messages').select('sender, content').eq('session_id', session_id).order('created_at', { ascending: true }).limit(10);
+        // 3. Prepare Chat Context — fetch last 30 messages for full conversation memory
+        const { data: history } = await supabase.from('chat_messages').select('sender, content').eq('session_id', session_id).order('created_at', { ascending: true }).limit(30);
         
         const tools = [
             {
@@ -98,19 +98,30 @@ serve(async (req) => {
             }
         ];
 
-        const systemPrompt = `You are the official concierge for "Restaurant Bag Søjlen", a premium French/Danish historic restaurant located in Rønde, Denmark. 
-        Tone: polite, professional, welcoming. 
-        Reply elegantly and briefly. Language: ${language || 'English'}.
-        If the user wants to book a table, use the book_table function. Do not ask for their name/email, we already have it.`;
+        const systemPrompt = `You are the official AI concierge for "Restaurant Bag Søjlen", a premium French-Danish restaurant in Rønde, Denmark.
 
-        const messages = [{ role: "system", content: systemPrompt }];
-        history?.forEach(msg => messages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.content.replace(/\[AUDIO:.*?\]/, '') }));
+CRITICAL RULES:
+- You MUST remember everything said earlier in this conversation. Never forget what the user already told you.
+- When collecting booking details (guests, date, time), keep track of what has already been provided. Do NOT ask for information already given.
+- Only call book_table when you have ALL THREE: guests count, date (YYYY-MM-DD), AND time (HH:MM).
+- If you have 2 of 3 details, ask ONLY for the missing one.
+- Respond in the SAME language the user is writing in. If they write in Danish, reply in Danish. English → English.
+- Tone: polite, professional, brief.
+- Do not ask for name or email — we already have those from the session.`;
+
+        const messages: any[] = [{ role: "system", content: systemPrompt }];
         
-        // If it was just audio, history already has the inserted user_message. If it's text, we append it now since the frontend saved it optimistically.
+        // Build full conversation history from database (this IS the memory)
+        const historyMessages = (history || []).filter(msg => msg.sender !== 'admin'); // skip welcome greetings
+        historyMessages.forEach(msg => {
+            messages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.content.replace(/\[AUDIO:.*?\]/g, '').trim() });
+        });
+        
+        // Ensure the current user message is at the end (avoid duplication)
         if (!audio_base64 && user_message) {
-            // Check if it's already in history
-            if (!history || history[history.length-1]?.content !== user_message) {
-               messages.push({ role: "user", content: user_message });
+            const lastMsg = messages[messages.length - 1];
+            if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== user_message.trim()) {
+                messages.push({ role: "user", content: user_message.trim() });
             }
         }
 
