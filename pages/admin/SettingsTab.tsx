@@ -282,9 +282,9 @@ export const SettingsTab: React.FC = () => {
                         </div>
                         
                         <div className="space-y-16">
-                            {(['confirmation', 'rejection', 'cancellation']).map((emailType) => (
+                            {(['confirmation', 'rejection', 'cancellation', 'newsletter_welcome']).map((emailType) => (
                                 <div key={emailType} className="border border-gray-100 p-6 bg-gray-50/50">
-                                    <h4 className="text-sm font-bold tracking-[0.2em] uppercase text-[#1a1a1a] mb-6">{emailType} Email</h4>
+                                    <h4 className="text-sm font-bold tracking-[0.2em] uppercase text-[#1a1a1a] mb-6">{emailType.replace('_', ' ')} Email</h4>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         {(['da', 'en', 'de']).map((lang) => (
@@ -397,6 +397,19 @@ export const SettingsTab: React.FC = () => {
                                                 <option value="false">Disabled (Text Only)</option>
                                                 <option value="true">Enabled (Generate Audio via ElevenLabs)</option>
                                             </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[10px] uppercase tracking-widest text-[#1a1a1a] font-bold mb-4">Reminder Email — Hours Before</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="72"
+                                                value={settings['reminder_hours_before'] || '5'}
+                                                onChange={e => handleSettingChange('reminder_hours_before', e.target.value)}
+                                                className="w-full text-sm border border-gray-300 py-3 px-4 focus:outline-none focus:border-[#CDA235] transition-colors bg-transparent"
+                                            />
+                                            <p className="text-[10px] text-gray-400 mt-2">Send guests a reminder email this many hours before their reservation (default: 5).</p>
                                         </div>
                                     </div>
                                 </div>

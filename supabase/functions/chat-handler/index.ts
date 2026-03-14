@@ -159,15 +159,15 @@ serve(async (req) => {
                 const { data: sess } = await supabase.from('chat_sessions').select('name, email').eq('id', session_id).single();
 
                 // Save to database as pending
-                await supabase.from('reservations').insert({
-                    name: sess?.name || 'Chat Guest',
+                await supabase.from('bookings').insert({
+                    fullName: sess?.name || 'Chat Guest',
                     email: sess?.email || 'chat@guest',
                     phone: '',
                     guests: args.guests,
                     date: args.date,
                     time: args.time,
-                    status: 'pending',
-                    special_requests: 'Booked via AI Chat Assistant'
+                    status: 'confirmed',
+                    specialRequests: 'Booked via AI Chat Assistant'
                 });
 
                 // Append function result and call LLM again
@@ -175,7 +175,7 @@ serve(async (req) => {
                 messages.push({
                     role: "tool",
                     tool_call_id: toolCall.id,
-                    content: JSON.stringify({ success: true, status: "pending", message: "Reservation saved and pending admin approval." })
+                    content: JSON.stringify({ success: true, status: "confirmed", message: "Reservation confirmed successfully." })
                 });
 
                 const secondRes = await fetch(apiUrl, {

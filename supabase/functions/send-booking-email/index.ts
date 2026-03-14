@@ -27,12 +27,32 @@ const generateEmailHtml = (type: string, data: any, lang: string) => {
         body = isDan 
             ? `<p>Kære ${data.name},</p><p>Vi er kede af at måtte meddele, at vi desværre ikke har plads til din anmodede reservation den <strong>${data.date} kl. ${data.time}</strong>.</p><p>Du er meget velkommen til at prøve en anden dato eller tidspunkt via vores hjemmeside.</p>`
             : `<p>Dear ${data.name},</p><p>We are sorry to inform you that we unfortunately cannot accommodate your requested reservation on <strong>${data.date} at ${data.time}</strong>.</p><p>You are more than welcome to try another date or time via our website.</p>`;
+    } else if (type === 'reminder') {
+        subject = isDan ? "Husk din reservation i aften" : "Reminder: Your reservation today";
+        title = isDan ? "Påmindelse om din reservation" : "Reservation Reminder";
+        body = isDan
+            ? `<p>Kære ${data.name},</p><p>Vi minder dig venligst om din reservation hos Restaurant Bag Søjlen i dag. Vi pakker bord til <strong>${data.guests} personer</strong> kl. <strong>${data.time}</strong>.</p><p>Vi glæder os til at se dig!</p>`
+            : `<p>Dear ${data.name},</p><p>This is a friendly reminder about your reservation at Restaurant Bag Søjlen today for <strong>${data.guests} people</strong> at <strong>${data.time}</strong>.</p><p>We look forward to seeing you!</p>`;
     } else if (type === 'cancellation') {
        subject = isDan ? "Bekræftelse på annullering" : "Cancellation Confirmation";
        title = isDan ? "Reservation Annulleret" : "Reservation Cancelled";
        body = isDan
            ? `<p>Kære ${data.name},</p><p>Din reservation den <strong>${data.date} kl. ${data.time}</strong> er nu blevet annulleret.</p><p>Vi håber at se dig en anden gang.</p>`
            : `<p>Dear ${data.name},</p><p>Your reservation on <strong>${data.date} at ${data.time}</strong> has now been cancelled.</p><p>We hope to see you another time.</p>`;
+    } else if (type === 'newsletter_welcome') {
+       if (lang === 'de') {
+           subject = "Danke für Ihre Anmeldung!";
+           title = "Willkommen bei Restaurant Bag Søjlen";
+           body = `<p>Danke für Ihre Anmeldung zu unserem Newsletter!</p><p>Sie erhalten nun die neuesten Nachrichten und exklusive Angebote direkt in Ihren Posteingang.</p>`;
+       } else if (lang === 'en') {
+           subject = "Thank you for subscribing!";
+           title = "Welcome to Restaurant Bag Søjlen";
+           body = `<p>Thank you for subscribing to our newsletter!</p><p>You will now receive the latest news and exclusive offers straight to your inbox.</p>`;
+       } else {
+           subject = "Tak for din tilmelding!";
+           title = "Velkommen til Restaurant Bag Søjlen";
+           body = `<p>Tak for din tilmelding til vores nyhedsbrev!</p><p>Du vil nu modtage de seneste nyheder og eksklusive tilbud direkte i din indbakke.</p>`;
+       }
     }
 
     const html = `

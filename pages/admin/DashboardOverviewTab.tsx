@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { 
-    Users, 
+    UtensilsCrossed, 
     CalendarCheck, 
     CalendarX, 
     CalendarDays, 
@@ -32,9 +32,12 @@ export const DashboardOverviewTab: React.FC<{
         confirmedReservations: 0,
         cancelledReservations: 0,
         newsletterSubmissions: 0,
-        emailConfirmations: 0,
-        dailyVisitors: 0 // Mocked for now until GA4 is integrated
+        emailConfirmations: 0
     });
+
+    const [totalTables, setTotalTables] = useState(100);
+    const [editingTables, setEditingTables] = useState(false);
+    const [tempTotalTables, setTempTotalTables] = useState(100);
 
     const [reservationData, setReservationData] = useState<any[]>([]);
     const [engagementData, setEngagementData] = useState<any[]>([]);
@@ -60,7 +63,7 @@ export const DashboardOverviewTab: React.FC<{
             // 2. Fetch Newsletters
             const { data: newsletters, error: newsletterError } = await supabase
                 .from('newsletter_subscribers')
-                .select('id, created_at');
+                .select('id, subscribed_at');
 
             // 3. Fetch Email Logs (Ensure this doesn't break if table doesn't exist yet)
             let emailCount = 0;
@@ -73,13 +76,26 @@ export const DashboardOverviewTab: React.FC<{
                 console.warn("email_logs table might not exist yet.");
             }
 
+            // 4. Fetch total_tables setting
+            const { data: tablesSetting } = await supabase
+                .from('settings')
+                .select('value')
+                .eq('key', 'total_tables')
+                .single();
+            if (tablesSetting?.value) {
+                const val = parseInt(tablesSetting.value, 10);
+                if (!isNaN(val)) {
+                    setTotalTables(val);
+                    setTempTotalTables(val);
+                }
+            }
+
             setStats({
                 totalReservations: total,
                 confirmedReservations: confirmed,
                 cancelledReservations: cancelled,
                 newsletterSubmissions: newsletters?.length || 0,
-                emailConfirmations: emailCount,
-                dailyVisitors: Math.floor(Math.random() * 50) + 120 // Mock value for now
+                emailConfirmations: emailCount
             });
 
             // Prepare Chart Data (Last 7 Days)
@@ -113,7 +129,7 @@ export const DashboardOverviewTab: React.FC<{
 
         // 2. Engagement Data (Mocking visitors, using real newsletters)
         const engData = last7Days.map(date => {
-            const dayNewsletters = newsletters.filter(n => n.created_at?.startsWith(date));
+            const dayNewsletters = newsletters.filter(n => n.subscribed_at?.startsWith(date));
             return {
                 name: date.split('-').slice(1).join('/'),
                 visitors: Math.floor(Math.random() * 30) + 40, // Mock visitors trend
@@ -121,6 +137,15 @@ export const DashboardOverviewTab: React.FC<{
             };
         });
         setEngagementData(engData);
+    };
+
+    const saveTotalTables = async () => {
+        await supabase.from('settings').upsert(
+            { key: 'total_tables', value: String(tempTotalTables), category: 'general' },
+            { onConflict: 'key' }
+        );
+        setTotalTables(tempTotalTables);
+        setEditingTables(false);
     };
 
     if (loading) {
@@ -176,18 +201,40 @@ export const DashboardOverviewTab: React.FC<{
                     </div>
                 </div>
 
-                {/* Engagement */}
-                <div className="bg-white p-6 shadow-sm border border-gray-100 flex items-start justify-between group hover:border-[#CDA235]/50 transition-colors relative overflow-hidden">
-                    <div className="z-10 relative">
-                        <div className="flex items-center gap-2 mb-1">
-                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Daily Visitors</p>
-                           <span className="text-[8px] bg-blue-50 text-blue-500 px-1 py-0.5 rounded">*GA4 Pending</span>
+                {/* Total Tables Booked */}
+                <div
+                    onClick={() => { setTempTotalTables(totalTables); setEditingTables(!editingTables); }}
+                    className="bg-white p-6 shadow-sm border border-gray-100 flex flex-col group hover:border-[#CDA235]/50 transition-colors relative overflow-hidden cursor-pointer"
+                >
+                    <div className="flex items-start justify-between">
+                        <div className="z-10 relative">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Tables Booked</p>
+                            <h3 className="text-3xl serif italic text-[#1a1a1a]">
+                                {stats.confirmedReservations} <span className="text-lg text-gray-300">/</span> <span className="text-lg text-gray-400">{totalTables} tables</span>
+                            </h3>
                         </div>
-                        <h3 className="text-3xl serif italic text-[#1a1a1a]">{stats.dailyVisitors}</h3>
+                        <div className="bg-[#CDA235]/10 p-3 rounded-full text-[#CDA235] group-hover:scale-110 transition-transform z-10 relative">
+                            <UtensilsCrossed size={20} />
+                        </div>
                     </div>
-                    <div className="bg-blue-50 p-3 rounded-full text-blue-600 group-hover:scale-110 transition-transform z-10 relative">
-                        <Users size={20} />
-                    </div>
+                    {editingTables && (
+                        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3" onClick={e => e.stopPropagation()}>
+                            <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400 whitespace-nowrap">Total Tables</label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={tempTotalTables}
+                                onChange={e => setTempTotalTables(parseInt(e.target.value, 10) || 1)}
+                                className="w-20 px-2 py-1 border border-gray-200 text-sm focus:outline-none focus:border-[#CDA235] text-center"
+                            />
+                            <button
+                                onClick={saveTotalTables}
+                                className="px-3 py-1 bg-[#CDA235] text-white text-[9px] font-bold uppercase tracking-widest hover:bg-[#1a1a1a] transition-colors"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="bg-white p-6 shadow-sm border border-gray-100 flex items-start justify-between group hover:border-[#CDA235]/50 transition-colors">
@@ -246,7 +293,7 @@ export const DashboardOverviewTab: React.FC<{
                 <div className="bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="serif italic text-2xl text-[#1a1a1a]">Site Engagement</h3>
-                        <Users size={18} className="text-blue-500" />
+                        <TrendingUp size={18} className="text-blue-500" />
                     </div>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">

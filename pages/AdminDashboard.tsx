@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Language } from '../translations';
 import { LayoutDashboard, FileText, Type, Settings, LogOut, Menu, X, Trash2, Edit3, Plus, Globe, Coffee, Calendar, Image as ImageIcon, Users, Send, Mail, MessageSquare } from 'lucide-react';
@@ -34,6 +34,18 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
     const [activeTab, setActiveTab] = useState<AdminTab>('overview');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const navigate = useNavigate();
+
+    // Notification system
+    interface Notification {
+        id: string;
+        type: 'reservation' | 'chat';
+        label: string;
+        time: string;
+    }
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [showNotifPanel, setShowNotifPanel] = useState(false);
+    const bellRef = useRef<HTMLButtonElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
 
     // Data States
     // No longer parsing pages/content inside the main dashboard component
@@ -87,6 +99,61 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
         // Main data fetch is now handled inside individual tabs
     };
 
+    // Set up real-time notification subscriptions once authenticated
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        const addNotif = (type: 'reservation' | 'chat', label: string) => {
+            setNotifications(prev => [...prev, {
+                id: `${Date.now()}-${Math.random()}`,
+                type,
+                label,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }]);
+        };
+
+        // Listen for new reservations
+        const bookingSub = supabase.channel('notif_bookings')
+            .on('postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'bookings' },
+                (payload) => {
+                    const name = payload.new?.fullName || 'a guest';
+                    addNotif('reservation', `New reservation from ${name}`);
+                }
+            )
+            .subscribe();
+
+        // Listen for new customer chat messages
+        const chatSub = supabase.channel('notif_chat_messages')
+            .on('postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'sender=eq.user' },
+                () => {
+                    addNotif('chat', 'New message from a customer');
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(bookingSub);
+            supabase.removeChannel(chatSub);
+        };
+    }, [isAuthenticated]);
+
+    // Click-outside handler: clear all notifications when clicking anywhere else
+    useEffect(() => {
+        const handleDocClick = (e: MouseEvent) => {
+            if (
+                bellRef.current && !bellRef.current.contains(e.target as Node) &&
+                panelRef.current && !panelRef.current.contains(e.target as Node)
+            ) {
+                setShowNotifPanel(false);
+                setNotifications([]);
+            }
+        };
+        document.addEventListener('mousedown', handleDocClick);
+        return () => document.removeEventListener('mousedown', handleDocClick);
+    }, []);
+
     if (!isAuthenticated) {
         return (
             <div className="bg-[#FAF9F6] min-h-[800px] py-32 px-8 flex flex-col items-center justify-center -mt-[80px]">
@@ -138,25 +205,86 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
             </div>
 
             {/* Sidebar */}
-            <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block w-full md:w-[280px] bg-[#1a1a1a] text-white flex-shrink-0 min-h-[calc(100vh-80px)] relative p-8 border-r border-[#CDA235]/20 z-10 transition-all`}>
-                <div className="mb-16 pb-8 border-b border-white/10 relative">
+            <div className={`${isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-[280px] bg-[#1a1a1a] text-white flex-shrink-0 min-h-screen border-r border-[#CDA235]/20 z-10 transition-all`}>
+                {/* Header */}
+                <div className="px-8 pt-8 pb-6 border-b border-white/10">
                     <span className="text-[#CDA235] text-[10px] font-bold tracking-[0.4em] uppercase block mb-3">ADMINISTRATOR</span>
                     <h2 className="text-2xl serif italic text-white flex items-center justify-between">
                         Dashboard
-                        <button className="relative text-gray-400 hover:text-white transition-colors">
-                            <Bell size={20} />
-                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#CDA235] opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#CDA235]"></span>
-                            </span>
-                        </button>
+                        <div className="relative mr-2">
+                            <button
+                                ref={bellRef}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowNotifPanel(prev => !prev);
+                                }}
+                                className="relative text-gray-400 hover:text-white transition-colors"
+                                title="Notifications"
+                            >
+                                <Bell size={20} />
+                                {notifications.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#CDA235] opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-[#CDA235]"></span>
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Notification Dropdown Panel */}
+                            {showNotifPanel && (
+                                <div
+                                    ref={panelRef}
+                                    className="absolute top-8 left-0 z-50 w-72 bg-[#111] border border-[#CDA235]/30 shadow-2xl rounded-sm overflow-hidden"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">Notifications</span>
+                                        {notifications.length > 0 && (
+                                            <button
+                                                onClick={() => { setNotifications([]); setShowNotifPanel(false); }}
+                                                className="text-[9px] uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+                                            >
+                                                Clear all
+                                            </button>
+                                        )}
+                                    </div>
+                                    {notifications.length === 0 ? (
+                                        <div className="px-4 py-6 text-center text-gray-500 text-xs italic">
+                                            No new notifications
+                                        </div>
+                                    ) : (
+                                        <ul className="max-h-64 overflow-y-auto divide-y divide-white/5">
+                                            {notifications.map(n => (
+                                                <li key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors">
+                                                    <span className="text-lg mt-0.5 shrink-0">
+                                                        {n.type === 'reservation' ? '📅' : '💬'}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-white text-[12px] font-medium leading-snug">{n.label}</p>
+                                                        <p className="text-gray-500 text-[10px] mt-0.5">{n.time}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setNotifications(prev => prev.filter(x => x.id !== n.id))}
+                                                        className="text-gray-600 hover:text-white text-xs mt-0.5 shrink-0 transition-colors"
+                                                        title="Dismiss"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </h2>
                 </div>
 
-                <nav className="space-y-2">
+                {/* Scrollable Nav */}
+                <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
                     <button
                         onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'overview' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'overview' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <LayoutDashboard size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Overview</span>
@@ -164,7 +292,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('reservations'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'reservations' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'reservations' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <Calendar size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Reservations</span>
@@ -172,7 +300,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('chat'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'chat' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'chat' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <MessageSquare size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Live Chat</span>
@@ -180,7 +308,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('menu'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'menu' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'menu' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <Coffee size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Menu</span>
@@ -188,7 +316,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('history'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'history' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'history' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <FileText size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Our History</span>
@@ -196,7 +324,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('pages'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'pages' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'pages' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <FileText size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Pages</span>
@@ -204,7 +332,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('content'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'content' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'content' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <Type size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Site Content</span>
@@ -212,7 +340,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('events'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'events' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'events' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <Calendar size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Events</span>
@@ -220,7 +348,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('gallery'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'gallery' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'gallery' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <ImageIcon size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Gallery</span>
@@ -228,7 +356,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('marketing'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'marketing' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'marketing' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <Users size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Customer Reviews</span>
@@ -236,7 +364,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
 
                     <button
                         onClick={() => { setActiveTab('newsletter'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'newsletter' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'newsletter' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                     >
                         <Mail size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Newsletter List</span>
@@ -246,14 +374,14 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                         <>
                             <button
                                 onClick={() => { setActiveTab('appearance'); setIsSidebarOpen(false); }}
-                                className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'appearance' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                                className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'appearance' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                             >
                                 <Type size={18} />
                                 <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Appearance</span>
                             </button>
                             <button
                                 onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
-                                className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors ${activeTab === 'settings' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                                className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'settings' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                             >
                                 <Settings size={18} />
                                 <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Settings</span>
@@ -262,17 +390,19 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     )}
                 </nav>
 
-                <div className="absolute bottom-8 left-8 right-8 space-y-4">
-                    <button onClick={() => window.open('/', '_blank')} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-white transition-colors border border-white/10 hover:border-white/30">
+                {/* Footer — always at bottom, never overlaps nav */}
+                <div className="px-6 py-4 border-t border-white/10 space-y-1 flex-shrink-0">
+                    <button onClick={() => window.open('/', '_blank')} className="w-full flex items-center gap-4 px-4 py-3 text-left text-gray-400 hover:text-white transition-colors border border-white/10 hover:border-white/30 rounded-sm">
                         <Globe size={18} />
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">View Site</span>
                     </button>
-                    <button onClick={handleLogout} className="w-full flex items-center gap-4 px-4 py-4 text-left text-gray-400 hover:text-red-400 transition-colors">
+                    <button onClick={handleLogout} className="w-full flex items-center gap-4 px-4 py-3 text-left text-gray-400 hover:text-red-400 transition-colors rounded-sm">
                         <LogOut size={18} />
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Log Out</span>
                     </button>
                 </div>
             </div>
+
 
             {/* Main Content Area */}
             <div className="flex-grow p-6 md:p-12 overflow-y-auto w-full bg-[#FAF9F6] relative z-0">

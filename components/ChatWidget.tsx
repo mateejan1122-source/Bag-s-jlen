@@ -30,6 +30,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
   const [isAudioTranscribing, setIsAudioTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // Inline booking form state
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingForm, setBookingForm] = useState({ date: '', time: '19:00', guests: 2 });
+  const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -115,17 +120,20 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
       
       let sessionId = null;
       
-      // Check for active session for this email
+      // Check for any existing session for this email
       const { data: existingSessions, error: findErr } = await supabase
         .from('chat_sessions')
         .select('*')
         .eq('email', regEmail)
-        .eq('status', 'open')
         .order('created_at', { ascending: false })
         .limit(1);
         
       if (!findErr && existingSessions && existingSessions.length > 0) {
         sessionId = existingSessions[0].id;
+        // If it was closed, reopen it
+        if (existingSessions[0].status !== 'open') {
+          await supabase.from('chat_sessions').update({ status: 'open', name: regName }).eq('id', sessionId);
+        }
       } else {
         // Create new session
         const { data: newSession, error: createErr } = await supabase
@@ -153,9 +161,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
         localStorage.setItem('bagsojlen_chat_session', JSON.stringify(info));
         loadMessages(sessionId);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to start chat", err);
-      alert("Could not start chat. Please try again later.");
+      alert(language === 'da' ? "Kunne ikke starte chatten. Prøv venligst igen senere." : "Could not start chat. Please try again later.");
     } finally {
       setIsRegistering(false);
     }
@@ -192,6 +200,43 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
 
     } catch (err) {
       console.error("Failed to send message", err);
+    }
+  };
+
+  // Inline reservation form submit
+  const handleBookingFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sessionInfo || !bookingForm.date || !bookingForm.time) return;
+    setIsBookingSubmitting(true);
+    try {
+      const { error } = await supabase.from('bookings').insert([{
+        date: bookingForm.date,
+        time: bookingForm.time,
+        guests: bookingForm.guests,
+        fullName: sessionInfo.name,
+        email: sessionInfo.email,
+        phone: '',
+        specialRequests: 'Booked via Chat Widget',
+        status: 'confirmed'
+      }]);
+      if (error) throw error;
+
+      // Add a confirmation message to the chat
+      await supabase.from('chat_messages').insert({
+        session_id: sessionInfo.id,
+        sender: 'ai',
+        content: language === 'da'
+          ? `✅ Din reservation er indsendt! ${bookingForm.date} kl. ${bookingForm.time} for ${bookingForm.guests} gæster. Vi bekræfter snarest.`
+          : `✅ Your reservation has been submitted! ${bookingForm.date} at ${bookingForm.time} for ${bookingForm.guests} guests. We will confirm shortly.`
+      });
+
+      setShowBookingForm(false);
+      setBookingForm({ date: '', time: '19:00', guests: 2 });
+    } catch (err) {
+      console.error('Booking from chat failed:', err);
+      alert('Failed to submit reservation. Please try again.');
+    } finally {
+      setIsBookingSubmitting(false);
     }
   };
 
@@ -370,6 +415,53 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
                     </div>
                   );
                 })}
+                {/* Inline Booking Form */}
+                {showBookingForm && (
+                  <div className="bg-white border border-[#CDA235]/30 p-4 shadow-sm">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">Book a Table</span>
+                      <button onClick={() => setShowBookingForm(false)} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                    </div>
+                    <form onSubmit={handleBookingFormSubmit} className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold block mb-1">{language === 'da' ? 'Dato' : 'Date'}</label>
+                          <input type="date" required value={bookingForm.date} onChange={e => setBookingForm({...bookingForm, date: e.target.value})} className="w-full text-sm border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-[#CDA235]" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold block mb-1">{language === 'da' ? 'Tid' : 'Time'}</label>
+                          <select value={bookingForm.time} onChange={e => setBookingForm({...bookingForm, time: e.target.value})} className="w-full text-sm border border-gray-200 px-2 py-1.5 focus:outline-none focus:border-[#CDA235] bg-white">
+                            {['17:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30','21:00','21:30','22:00'].map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold block mb-1">{language === 'da' ? 'Gæster' : 'Guests'}</label>
+                        <div className="flex items-center gap-3 border border-gray-200 px-3 py-1.5">
+                          <button type="button" onClick={() => setBookingForm({...bookingForm, guests: Math.max(1, bookingForm.guests - 1)})} className="text-lg hover:text-[#CDA235]">−</button>
+                          <span className="text-sm font-bold flex-1 text-center">{bookingForm.guests}</span>
+                          <button type="button" onClick={() => setBookingForm({...bookingForm, guests: bookingForm.guests + 1})} className="text-lg hover:text-[#CDA235]">+</button>
+                        </div>
+                      </div>
+                      <button type="submit" disabled={!bookingForm.date || isBookingSubmitting} className="w-full bg-[#CDA235] text-white py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-[#1a1a1a] transition-colors disabled:opacity-50">
+                        {isBookingSubmitting ? '...' : (language === 'da' ? 'Send Reservation' : 'Submit Reservation')}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {/* Quick Book Button — appears if no form is open and messages contain booking-related AI content */}
+                {!showBookingForm && sessionInfo && messages.length > 0 && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={() => setShowBookingForm(true)}
+                      className="text-[10px] font-bold uppercase tracking-widest text-[#CDA235] border border-[#CDA235]/30 px-4 py-2 hover:bg-[#CDA235] hover:text-white transition-colors"
+                    >
+                      📅 {language === 'da' ? 'Book et bord' : 'Book a Table'}
+                    </button>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </div>
             )}

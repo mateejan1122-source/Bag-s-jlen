@@ -46,6 +46,12 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
       if (error && error.code !== '23505') throw error;
       setStatus('success');
       setEmail('');
+
+      // Send thank-you email (fire and forget)
+      supabase.functions.invoke('send-booking-email', {
+        body: { type: 'newsletter_welcome', email, language, name: '' }
+      }).catch(err => console.error('Welcome email error:', err));
+
       setTimeout(() => setStatus('idle'), 5000);
     } catch (err) {
       setStatus('error');
