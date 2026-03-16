@@ -84,7 +84,7 @@ serve(async (req) => {
                 type: "function",
                 function: {
                     name: "book_table",
-                    description: "Book a table for a guest at the restaurant. Automatically defaults to 'pending' status.",
+                    description: "Book a table for a guest at the restaurant. Automatically defaults to 'confirmed' status.",
                     parameters: {
                         type: "object",
                         properties: {
@@ -95,19 +95,40 @@ serve(async (req) => {
                         required: ["guests", "date", "time"]
                     }
                 }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "get_user_reservations",
+                    description: "Retrieve all active future reservations for the current user.",
+                    parameters: { type: "object", properties: {} }
+                }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "cancel_reservation",
+                    description: "Cancel a specific reservation by ID. Only use IDs returned from get_user_reservations.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            reservation_id: { type: "string", description: "The internal database ID of the reservation" }
+                        },
+                        required: ["reservation_id"]
+                    }
+                }
             }
         ];
 
         const systemPrompt = `You are the official AI concierge for "Restaurant Bag Søjlen", a premium French-Danish restaurant in Rønde, Denmark.
 
 CRITICAL RULES:
-- You MUST remember everything said earlier in this conversation. Never forget what the user already told you.
-- When collecting booking details (guests, date, time), keep track of what has already been provided. Do NOT ask for information already given.
-- Only call book_table when you have ALL THREE: guests count, date (YYYY-MM-DD), AND time (HH:MM).
-- If you have 2 of 3 details, ask ONLY for the missing one.
-- Respond in the SAME language the user is writing in. If they write in Danish, reply in Danish. English → English.
-- Tone: polite, professional, brief.
-- Do not ask for name or email — we already have those from the session.`;
+- You MUST remember everything said earlier in this conversation.
+- Booking: Only call book_table when you have guests, date (YYYY-MM-DD), and time (HH:MM).
+- Cancellation: If a user wants to cancel, first use get_user_reservations to show them their bookings. Then call cancel_reservation with the specific ID they choose.
+- SECURITY: You only have access to reservations matching the user's current session name and email.
+- Respond in the SAME language the user is writing in (Danish, English, or German).
+- Tone: polite, professional, brief.`;
 
         const messages: any[] = [{ role: "system", content: systemPrompt }];
         
@@ -151,7 +172,7 @@ CRITICAL RULES:
                 tools,
                 tool_choice: "auto",
                 temperature: 0.7,
-                max_tokens: 300
+                max_tokens: 400
             })
         });
 
@@ -160,17 +181,18 @@ CRITICAL RULES:
 
         let responseMsg = chatData.choices[0].message;
 
-        // 5. Handle Function Calling (Reservation)
+        // 5. Handle Function Calling
         if (responseMsg.tool_calls) {
             const toolCall = responseMsg.tool_calls[0];
-            if (toolCall.function.name === 'book_table') {
-                const args = JSON.parse(toolCall.function.arguments);
-                
-                // Fetch the user's name and email from session_info
-                const { data: sess } = await supabase.from('chat_sessions').select('name, email').eq('id', session_id).single();
+            const funcName = toolCall.function.name;
+            const args = JSON.parse(toolCall.function.arguments);
+            let toolResult = "";
 
-                // Save to database as pending
-                await supabase.from('bookings').insert({
+            // Fetch the user's details for scoped operations
+            const { data: sess } = await supabase.from('chat_sessions').select('name, email').eq('id', session_id).single();
+
+            if (funcName === 'book_table') {
+                const { data: newBooking, error: bErr } = await supabase.from('bookings').insert({
                     fullName: sess?.name || 'Chat Guest',
                     email: sess?.email || 'chat@guest',
                     phone: '',
@@ -179,24 +201,68 @@ CRITICAL RULES:
                     time: args.time,
                     status: 'confirmed',
                     specialRequests: 'Booked via AI Chat Assistant'
-                });
+                }).select().single();
 
-                // Append function result and call LLM again
-                messages.push(responseMsg);
-                messages.push({
-                    role: "tool",
-                    tool_call_id: toolCall.id,
-                    content: JSON.stringify({ success: true, status: "confirmed", message: "Reservation confirmed successfully." })
-                });
-
-                const secondRes = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model, messages, temperature: 0.7 })
-                });
-                const secData = await secondRes.json();
-                responseMsg = secData.choices[0].message;
+                if (!bErr && newBooking) {
+                    toolResult = JSON.stringify({ success: true, status: "confirmed", message: "Reservation confirmed." });
+                    // Trigger Confirmation Email
+                    await supabase.functions.invoke('send-booking-email', {
+                        body: { type: 'confirmation', name: newBooking.fullName, email: newBooking.email, date: newBooking.date, time: newBooking.time, guests: newBooking.guests, language }
+                    }).catch(e => console.error("Email err:", e));
+                } else {
+                    toolResult = JSON.stringify({ success: false, error: bErr?.message });
+                }
+            } 
+            else if (funcName === 'get_user_reservations') {
+                const today = new Date().toISOString().split('T')[0];
+                const { data: myBookings } = await supabase.from('bookings')
+                    .select('id, date, time, guests, status')
+                    .eq('email', sess?.email)
+                    .ilike('fullName', sess?.name)
+                    .neq('status', 'cancelled')
+                    .gte('date', today)
+                    .order('date', { ascending: true });
+                
+                toolResult = JSON.stringify(myBookings || []);
             }
+            else if (funcName === 'cancel_reservation') {
+                const { data: target } = await supabase.from('bookings')
+                    .select('*')
+                    .eq('id', args.reservation_id)
+                    .eq('email', sess?.email)
+                    .single();
+
+                if (target) {
+                    const { error: cErr } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', target.id);
+                    if (!cErr) {
+                        toolResult = JSON.stringify({ success: true, message: "Reservation cancelled successfully." });
+                        // Trigger Cancellation Email
+                        await supabase.functions.invoke('send-booking-email', {
+                            body: { type: 'cancellation', name: target.fullName, email: target.email, date: target.date, time: target.time, guests: target.guests, language }
+                        }).catch(e => console.error("Email err:", e));
+                    } else {
+                        toolResult = JSON.stringify({ success: false, error: cErr.message });
+                    }
+                } else {
+                    toolResult = JSON.stringify({ success: false, error: "Reservation not found or access denied." });
+                }
+            }
+
+            // Append function result and call LLM again
+            messages.push(responseMsg);
+            messages.push({
+                role: "tool",
+                tool_call_id: toolCall.id,
+                content: toolResult
+            });
+
+            const secondRes = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model, messages, temperature: 0.7 })
+            });
+            const secData = await secondRes.json();
+            responseMsg = secData.choices[0].message;
         }
 
         let finalAnswerText = responseMsg.content || "I have processed your request.";
@@ -205,14 +271,10 @@ CRITICAL RULES:
         // 6. Generate Text-to-Speech (ElevenLabs)
         if (enableVoice && eLabsKey) {
             try {
-                // Rachel default voice ID
                 const voiceId = "21m00Tcm4TlvDq8ikWAM"; 
                 const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
                     method: 'POST',
-                    headers: {
-                        'xi-api-key': eLabsKey,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'xi-api-key': eLabsKey, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         text: finalAnswerText,
                         model_id: "eleven_monolingual_v1",
@@ -223,25 +285,17 @@ CRITICAL RULES:
                 if (ttsRes.ok) {
                     const audioBlob = await ttsRes.blob();
                     const fileName = `${session_id}_${Date.now()}.mp3`;
-                    
-                    // Upload to Supabase Storage
-                    const { data: uploadData, error: uploadErr } = await supabase.storage.from('chat_audio').upload(fileName, audioBlob, {
-                        contentType: 'audio/mpeg',
-                        upsert: false
-                    });
+                    const { data: uploadData, error: uploadErr } = await supabase.storage.from('chat_audio').upload(fileName, audioBlob, { contentType: 'audio/mpeg', upsert: false });
 
                     if (!uploadErr) {
                         const { data: publicUrlData } = supabase.storage.from('chat_audio').getPublicUrl(fileName);
                         if (publicUrlData?.publicUrl) {
                             finalOutput = `${finalAnswerText} [AUDIO:${publicUrlData.publicUrl}]`;
                         }
-                    } else {
-                        console.error('TTS Upload err:', uploadErr);
                     }
                 }
             } catch (ttsErr) {
                 console.error("ElevenLabs error:", ttsErr);
-                // Fail silently for audio, still send text
             }
         }
 

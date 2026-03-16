@@ -190,9 +190,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
         
       if (msgErr) throw msgErr;
 
-      // 2. Optimistically add to UI
-      setMessages(prev => [...prev, msgData]);
-
       // 3. Trigger edge function for AI response (Edge function will check if AI is enabled)
       supabase.functions.invoke('chat-handler', {
         body: { session_id: sessionInfo.id, user_message: content, language: language }
