@@ -695,6 +695,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
 
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [receivedOrderId, setReceivedOrderId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // ─── Time slot arrays ────────────────────────────────────────────────
@@ -814,6 +815,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
 
         // Success — confirmation email already sent server-side
         onBookingConfirmed(bookingData);
+        setReceivedOrderId(result?.orderId || null);
         setBookingStep('success');
       } catch (err: any) {
         console.error("Booking error:", err);
@@ -1089,7 +1091,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
 
                 <div className="flex justify-between items-center mb-8 border-b border-dashed border-gray-200 pb-4">
                   <span className="text-[8px] font-bold uppercase tracking-[0.3em] text-[#CDA235]">{tConf.details}</span>
-                  <span className="text-[8px] font-mono text-gray-300">REF: #BS-{Math.floor(Math.random() * 90000 + 10000)}</span>
+                  <span className="text-[8px] font-mono text-gray-300">REF: {receivedOrderId || `#BS-${Math.floor(Math.random() * 90000 + 10000)}`}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-y-8">

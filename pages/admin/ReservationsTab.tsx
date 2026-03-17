@@ -212,9 +212,9 @@ export const ReservationsTab: React.FC = () => {
 
     const exportToCsv = () => {
         if (filteredAndSortedBookings.length === 0) return;
-        const headers = ['Date', 'Time', 'Name', 'Guests', 'Email', 'Phone', 'Requests', 'Status'];
+        const headers = ['Order ID', 'Date', 'Time', 'Name', 'Guests', 'Email', 'Phone', 'Requests', 'Status'];
         const rows = filteredAndSortedBookings.map(b => [
-            b.date, b.time, `"${b.fullName}"`, b.guests, b.email, b.phone, `"${(b.specialRequests || '').replace(/"/g, '""')}"`, b.status
+            b.order_id || b.id, b.date, b.time, `"${b.fullName}"`, b.guests, b.email, b.phone, `"${(b.specialRequests || '').replace(/"/g, '""')}"`, b.status
         ]);
         const csvContent = "data:text/csv;charset=utf-8,"
             + headers.join(',') + '\n'
@@ -390,6 +390,9 @@ export const ReservationsTab: React.FC = () => {
                     <table className="w-full text-left border-collapse min-w-[900px]">
                         <thead>
                             <tr className="bg-[#faf9f6]">
+                                <th className="py-6 px-8 text-[10px] font-bold text-[#CDA235] uppercase tracking-[0.3em] border-b border-gray-100">
+                                    ID
+                                </th>
                                 <th onClick={() => handleSort('date')} className="py-6 px-8 text-[10px] font-bold text-[#CDA235] uppercase tracking-[0.3em] border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
                                     Date & Time {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
@@ -416,6 +419,11 @@ export const ReservationsTab: React.FC = () => {
                             ) : (
                                 filteredAndSortedBookings.map((booking) => (
                                     <tr key={booking.id} className="border-b border-gray-50 hover:bg-[#faf9f6]/50 transition-colors group">
+                                        <td className="py-6 px-8">
+                                            <div className="text-[10px] font-mono text-gray-400">
+                                                {booking.order_id || '-'}
+                                            </div>
+                                        </td>
                                         <td className="py-6 px-8">
                                             <div className="font-bold text-[#1a1a1a] tracking-wider">{booking.date}</div>
                                             <div className="text-gray-400 italic serif mt-1">{booking.time}</div>

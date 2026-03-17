@@ -16,6 +16,12 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ─── Generate unique random Order ID (e.g. BS-12345) ────────────────────
+const generateOrderId = () => {
+    const random = Math.floor(Math.random() * 90000 + 10000);
+    return `BS-${random}`;
+};
+
 // ─── Default email templates (fallback if admin hasn't configured custom ones) ──
 const generateFallbackEmail = (type: string, data: any, lang: string) => {
     const isDan = lang === 'da';
@@ -58,7 +64,7 @@ const sendEmailWithTemplate = async (
     supabase: any,
     to: string,
     type: string,
-    data: { name: string; date: string; time: string; guests: number },
+    data: { name: string; date: string; time: string; guests: number; order_id?: string },
     lang: string
 ) => {
     if (!SMTP_HOSTNAME || !SMTP_USERNAME || !SMTP_PASSWORD) {
@@ -90,7 +96,8 @@ const sendEmailWithTemplate = async (
                     .replace(/{name}/g, data.name)
                     .replace(/{date}/g, data.date)
                     .replace(/{time}/g, data.time)
-                    .replace(/{guests}/g, String(data.guests));
+                    .replace(/{guests}/g, String(data.guests))
+                    .replace(/{order_id}/g, data.order_id || '');
             }
 
             if (bodyRow && bodyRow.value.trim() !== '') {
@@ -98,7 +105,8 @@ const sendEmailWithTemplate = async (
                     .replace(/{name}/g, data.name)
                     .replace(/{date}/g, data.date)
                     .replace(/{time}/g, data.time)
-                    .replace(/{guests}/g, String(data.guests));
+                    .replace(/{guests}/g, String(data.guests))
+                    .replace(/{order_id}/g, data.order_id || '');
 
                 finalHtml = wrapEmailHtml(parsedBody);
             }
@@ -206,12 +214,14 @@ serve(async (req) => {
         }
 
         // ── 4. INSERT the booking ────────────────────────────────────────
+        const order_id = generateOrderId();
         const { data: insertedBooking, error: insertError } = await supabase
             .from('bookings')
             .insert([{
                 date, time, guests, fullName, email, phone,
                 specialRequests: specialRequests || '',
-                status: 'confirmed'
+                status: 'confirmed',
+                order_id
             }])
             .select()
             .single();
@@ -226,7 +236,7 @@ serve(async (req) => {
         // ── 5. Send confirmation email using admin template ──────────────
         try {
             await sendEmailWithTemplate(supabase, email, 'confirmation', {
-                name: fullName, date, time, guests
+                name: fullName, date, time, guests, order_id
             }, lang);
         } catch (emailErr) {
             console.error("Failed to send confirmation email:", emailErr);
@@ -237,6 +247,7 @@ serve(async (req) => {
             success: true,
             message: "Booking confirmed",
             bookingId: insertedBooking?.id,
+            orderId: order_id,
             remaining: totalTables - currentCount - 1
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,

@@ -14,6 +14,8 @@ type ManageFlow = 'verify' | 'dashboard' | 'change' | 'cancel' | 'success';
 const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking, initialFlow = 'verify', language }) => {
   const [flow, setFlow] = useState<ManageFlow>(initialFlow);
   const [newTime, setNewTime] = useState('20:00');
+  const [newDate, setNewDate] = useState('');
+  const [dateWarning, setDateWarning] = useState<string | null>(null);
   const [successType, setSuccessType] = useState<'change' | 'cancel'>('change');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -47,6 +49,8 @@ const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking,
            setError(language === 'da' ? 'Din reservation er allerede annulleret.' : 'Your reservation has been canceled.');
         } else {
            setActiveBooking(data[0]);
+           setNewTime(data[0].time);
+           setNewDate(data[0].date);
            setFlow('dashboard');
         }
       } else {
@@ -70,11 +74,14 @@ const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking,
     try {
       const { error: updateError } = await supabase
         .from('bookings')
-        .update({ time: newTime })
+        .update({ 
+          time: newTime,
+          date: newDate
+        })
         .eq('id', activeBooking.id);
       if (updateError) throw updateError;
 
-      setActiveBooking({ ...activeBooking, time: newTime });
+      setActiveBooking({ ...activeBooking, time: newTime, date: newDate });
       setSuccessType('change');
       setFlow('success');
     } catch (err) {
@@ -180,7 +187,7 @@ const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking,
                 <span className="text-[#CDA235] text-[10px] font-bold tracking-[0.4em] uppercase block mb-2">{t.status}</span>
                 <h2 className="text-4xl serif italic">{t.dashboard}</h2>
               </div>
-              <span className="text-xs font-mono text-gray-300">REF: #BS-98421</span>
+              <span className="text-xs font-mono text-gray-300">REF: {activeBooking.order_id || '#BS-PENDING'}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-10 py-12 border-y border-gray-50 mb-16">
@@ -210,15 +217,72 @@ const ManageReservation: React.FC<ManageReservationProps> = ({ confirmedBooking,
           <div className="bg-white p-16 shadow-2xl border border-gray-100 max-w-2xl w-full relative">
             <div className="absolute top-0 left-0 w-full h-[4px] bg-[#CDA235]"></div>
             <h2 className="text-4xl serif italic mb-4 text-center">{t.chooseNew}</h2>
-            <div className="grid grid-cols-3 gap-4 mb-16 mt-8">
-              {['17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(tm => (
-                <button key={tm} onClick={() => setNewTime(tm)} className={`py-8 border-2 transition-all ${newTime === tm ? 'border-[#CDA235] bg-[#CDA235] text-white' : 'border-gray-50 text-gray-400 hover:border-gray-200'}`}>
-                  <span className="text-lg serif italic">{tm}</span>
-                </button>
-              ))}
+            
+            <div className="space-y-8 mt-10">
+              <div className="flex flex-col gap-3">
+                <label className="text-[10px] font-bold uppercase tracking-[0.4em] text-gray-400 ml-1">{translations[language].booking.date} *</label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={newDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) {
+                      setNewDate('');
+                      return;
+                    }
+                    const d = new Date(val + 'T00:00:00');
+                    const day = d.getDay(); // 0=Sun, 1=Mon
+                    if (day === 0 || day === 1) {
+                      setDateWarning(
+                        language === 'da' ? 'Vi holder lukket søndag og mandag. Vælg venligst en anden dag.' :
+                        language === 'de' ? 'Sonntag und Montag geschlossen. Bitte wählen Sie einen anderen Tag.' :
+                        'We are closed on Sundays and Mondays. Please select another day.'
+                      );
+                      setNewDate('');
+                    } else {
+                      setDateWarning(null);
+                      setNewDate(val);
+                    }
+                  }}
+                  className="bg-[#faf9f6] border border-gray-100 p-4 md:p-6 text-base text-[#1a1a1a] outline-none focus:border-[#CDA235] transition-all h-14 md:h-16 serif italic"
+                />
+                {dateWarning && <p className="text-red-500 text-[11px] italic transition-all animate-in fade-in">{dateWarning}</p>}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <label className="text-[10px] font-bold uppercase tracking-[0.4em] text-gray-400 ml-1">{translations[language].flow.selectTime} *</label>
+                <div className="grid grid-cols-3 gap-4">
+                  {['17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(tm => {
+                    // 5-hour advance rule for today
+                    const now = new Date();
+                    const isToday = newDate === now.toISOString().split('T')[0];
+                    let disabled = false;
+                    if (isToday) {
+                      const [h, m] = tm.split(':').map(Number);
+                      const slotDate = new Date(now);
+                      slotDate.setHours(h, m, 0, 0);
+                      const fiveHoursFromNow = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+                      if (slotDate < fiveHoursFromNow) disabled = true;
+                    }
+
+                    return (
+                      <button 
+                        key={tm} 
+                        disabled={disabled}
+                        onClick={() => setNewTime(tm)} 
+                        className={`py-6 border-2 transition-all ${newTime === tm ? 'border-[#CDA235] bg-[#CDA235] text-white' : (disabled ? 'bg-gray-50 border-gray-50 text-gray-200 cursor-not-allowed' : 'border-gray-50 text-gray-400 hover:border-gray-200')}`}
+                      >
+                        <span className="text-lg serif italic">{tm}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            {error && <p className="text-red-500 text-xs italic mb-4 text-center">{error}</p>}
-            <button disabled={isSubmitting} onClick={handleUpdate} className={`w-full py-8 text-[11px] font-bold uppercase tracking-[0.5em] transition-all ${isSubmitting ? 'bg-gray-100 text-gray-400' : 'bg-[#1a1a1a] text-white hover:bg-[#CDA235]'}`}>
+
+            {error && <p className="text-red-500 text-xs italic mb-4 mt-8 text-center">{error}</p>}
+            <button disabled={isSubmitting || !newDate} onClick={handleUpdate} className={`w-full mt-10 py-8 text-[11px] font-bold uppercase tracking-[0.5em] transition-all ${isSubmitting || !newDate ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#1a1a1a] text-white hover:bg-[#CDA235]'}`}>
               {isSubmitting ? '...' : t.confirmChange + ' →'}
             </button>
           </div>

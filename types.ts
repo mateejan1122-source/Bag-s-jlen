@@ -7,6 +7,7 @@ export interface BookingData {
   email: string;
   phone: string;
   specialRequests: string;
+  order_id?: string;
 }
 
 export type BookingStep = 'home' | 'select-time' | 'guest-details' | 'confirmation';
