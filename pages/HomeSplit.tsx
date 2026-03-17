@@ -41,27 +41,35 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
         }
       });
 
-    // Fetch the featured event
-    const fetchNextUpcomingEvent = () => {
-      supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(1)
-        .then(({ data }) => {
-          if (data && data.length > 0) {
-            setFeaturedEvent(data[0]);
-          }
-        });
+    const fetchEventWithSlug = async (id: string) => {
+      const { data: eventData } = await supabase.from('events').select('*').eq('id', id).single();
+      if (eventData) {
+        setFeaturedEvent(eventData);
+        // Fetch slug from settings
+        const { data: slugData } = await supabase.from('settings').select('value').eq('key', `event_seo_${id}_slug`).maybeSingle();
+        if (slugData?.value) {
+          // Store slug in a temp property or handling it in navigation
+          eventData.slug = slugData.value;
+        }
+      } else {
+        fetchNextUpcomingEvent();
+      }
+    };
+
+    const fetchNextUpcomingEvent = async () => {
+      const { data } = await supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(1);
+      if (data && data.length > 0) {
+        const event = data[0];
+        setFeaturedEvent(event);
+        const { data: slugData } = await supabase.from('settings').select('value').eq('key', `event_seo_${event.id}_slug`).maybeSingle();
+        if (slugData?.value) event.slug = slugData.value;
+      }
     };
 
     supabase.from('settings').select('*').eq('key', 'featured_event_id').maybeSingle()
       .then(({ data: settingsData }) => {
         if (settingsData && settingsData.value) {
-          supabase.from('events').select('*').eq('id', settingsData.value).single()
-            .then(({ data: eventData }) => {
-              if (eventData) {
-                setFeaturedEvent(eventData);
-              } else {
-                fetchNextUpcomingEvent();
-              }
-            });
+          fetchEventWithSlug(settingsData.value);
         } else {
           fetchNextUpcomingEvent();
         }
@@ -277,12 +285,23 @@ const MenuItem: React.FC<{ name: string; price: string | number; desc?: string; 
 );
 
 export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language }) => {
-  const [activeTab, setActiveTab] = useState<'alacarte' | 'takeaway' | 'frokost' | 'kids'>('alacarte');
+  const [activeTab, setActiveTab] = useState<string>('');
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [selectedDish, setSelectedDish] = useState<any | null>(null);
+  const [menuCategories, setMenuCategories] = useState<{ id: string; name: string; display_order: number; is_visible: boolean }[]>([]);
   const tMenu = translations[language].menu;
   const tSeas = translations[language].seasonal;
+
+  // Default categories (fallback if admin hasn't customized them)
+  const defaultCategories = [
+    { id: 'STARTERS', name: tMenu.tabs?.alacarte || 'À La Carte', display_order: 0, is_visible: true, group: 'alacarte' },
+    { id: 'MAINS', name: tMenu.tabs?.alacarte || 'À La Carte', display_order: 1, is_visible: true, group: 'alacarte' },
+    { id: 'DESSERTS', name: tMenu.tabs?.alacarte || 'À La Carte', display_order: 2, is_visible: true, group: 'alacarte' },
+    { id: 'TAKEAWAY', name: tMenu.tabs?.takeaway || 'Takeaway', display_order: 3, is_visible: true },
+    { id: 'FROKOST', name: tMenu.tabs?.frokost || 'Frokost', display_order: 4, is_visible: true },
+    { id: 'KIDS', name: tMenu.tabs?.kids || 'Børnemenu', display_order: 5, is_visible: true },
+  ];
 
   React.useEffect(() => {
     supabase.from('menu_items').select('*').eq('is_visible', true).order('display_order', { ascending: true })
@@ -291,12 +310,29 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
     supabase.from('settings').select('*')
       .then(({ data }) => {
         if (data) {
-          setSettings(data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}));
+          const map = data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {} as Record<string, string>);
+          setSettings(map);
+
+          // Parse dynamic categories
+          if (map.menu_categories) {
+            try {
+              const parsed = JSON.parse(map.menu_categories);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                const visible = parsed.filter((c: any) => c.is_visible !== false);
+                setMenuCategories(visible);
+                if (visible.length > 0 && !activeTab) setActiveTab(visible[0].id);
+                return;
+              }
+            } catch { /* fallback */ }
+          }
+          // No custom categories — use defaults
+          setActiveTab('alacarte');
         }
       });
   }, []);
 
-  const getItems = (catStr: string) => menuItems.filter(item => item.category?.toLowerCase().includes(catStr));
+  const getItems = (catId: string) => menuItems.filter(item => item.category === catId);
+  const getItemsByGroup = (catIds: string[]) => menuItems.filter(item => catIds.includes(item.category));
 
   return (
     <div className="flex flex-col bg-[#faf9f6] w-full">
@@ -333,134 +369,174 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
 
         {/* Navigation Tabs */}
         <div className="flex flex-wrap justify-center gap-4 md:gap-12 mb-16 md:mb-32 border-b border-gray-100 pb-4 md:pb-10 overflow-x-auto no-scrollbar whitespace-nowrap">
-          {[
-            { id: 'alacarte', label: tMenu.tabs.alacarte },
-            { id: 'takeaway', label: tMenu.tabs.takeaway },
-            { id: 'frokost', label: tMenu.tabs.frokost },
-            { id: 'kids', label: tMenu.tabs.kids },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] md:tracking-[0.4em] pb-4 md:pb-6 transition-all relative ${activeTab === tab.id ? 'text-[#1a1a1a]' : 'text-gray-300 hover:text-[#CDA235]'
-                }`}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-[-2px] left-0 w-full h-[2px] md:h-[3px] bg-[#CDA235]"></div>
-              )}
-            </button>
-          ))}
+          {menuCategories.length > 0 ? (
+            /* ── Dynamic categories from admin ── */
+            menuCategories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveTab(cat.id)}
+                className={`text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] md:tracking-[0.4em] pb-4 md:pb-6 transition-all relative ${activeTab === cat.id ? 'text-[#1a1a1a]' : 'text-gray-300 hover:text-[#CDA235]'
+                  }`}
+              >
+                {cat.name}
+                {activeTab === cat.id && (
+                  <div className="absolute bottom-[-2px] left-0 w-full h-[2px] md:h-[3px] bg-[#CDA235]"></div>
+                )}
+              </button>
+            ))
+          ) : (
+            /* ── Fallback: hardcoded tabs ── */
+            [
+              { id: 'alacarte', label: tMenu.tabs.alacarte },
+              { id: 'takeaway', label: tMenu.tabs.takeaway },
+              { id: 'frokost', label: tMenu.tabs.frokost },
+              { id: 'kids', label: tMenu.tabs.kids },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] md:tracking-[0.4em] pb-4 md:pb-6 transition-all relative ${activeTab === tab.id ? 'text-[#1a1a1a]' : 'text-gray-300 hover:text-[#CDA235]'
+                  }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-[-2px] left-0 w-full h-[2px] md:h-[3px] bg-[#CDA235]"></div>
+                )}
+              </button>
+            ))
+          )}
         </div>
 
         {/* Tab Content */}
         <div className="max-w-6xl mx-auto min-h-[500px] md:min-h-[600px]">
-          {activeTab === 'alacarte' && (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-16 text-left animate-in fade-in duration-500">
-              <div>
-                <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.starters}</h3>
-                {getItems('starters').length > 0 ? getItems('starters').map(item => (
+          {menuCategories.length > 0 ? (
+            /* ── Dynamic content: show dishes for active category ── */
+            <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500" key={activeTab}>
+              {(() => {
+                const items = getItems(activeTab);
+                if (items.length === 0) {
+                  return (
+                    <div className="py-20 text-center text-gray-300 text-[12px] uppercase tracking-[0.2em] font-bold italic">
+                      {language === 'da' ? 'Ingen retter i denne menu endnu' : 'No dishes in this menu yet'}
+                    </div>
+                  );
+                }
+                return items.map(item => (
                   <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
-                )) : (
-                  <>
-                    <MenuItem name={tMenu.items.soup} price="98,-" desc={tMenu.items.soupDesc} />
-                    <MenuItem name={tMenu.items.prawns} price="128,-" desc={tMenu.items.prawnsDesc} />
-                    <MenuItem name={tMenu.items.carpaccio} price="138,-" desc={tMenu.items.carpaccioDesc} />
-                  </>
-                )}
-              </div>
-              <div>
-                <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.main}</h3>
-                {getItems('mains').length > 0 ? getItems('mains').map(item => (
-                  <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
-                )) : (
-                  <>
-                    <MenuItem name={tMenu.items.fish} price="238,-" desc={tMenu.items.fishDesc} />
-                    <MenuItem name={tMenu.items.schnitzel} price="268,-" desc={tMenu.items.schnitzelDesc} />
-                    <MenuItem name={tMenu.items.duck} price="268,-" desc={tMenu.items.duckDesc} />
-                    <MenuItem name={tMenu.items.steak} price="378,-" desc={tMenu.items.steakDesc} />
-                  </>
-                )}
-              </div>
-              <div>
-                <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.dessert}</h3>
-                {getItems('dessert').length > 0 ? getItems('dessert').map(item => (
-                  <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
-                )) : (
-                  <>
-                    <MenuItem name={tMenu.items.tart} price="98,-" desc={tMenu.items.tartDesc} />
-                    <MenuItem name={tMenu.items.cake} price="98,-" desc={tMenu.items.cakeDesc} />
-                    <MenuItem name={tMenu.items.brulee} price="98,-" desc={tMenu.items.bruleeDesc} />
-                  </>
-                )}
-              </div>
+                ));
+              })()}
             </div>
-          )}
-          {activeTab === 'takeaway' && (
-            <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
-              <div className="text-center mb-12">
-                <h3 className="text-2xl md:text-3xl serif text-[#1a1a1a] mb-2">T A K E A W A Y</h3>
-                <p className="text-[#CDA235] font-bold tracking-[0.3em]">{tMenu.takeaway.phone}</p>
-              </div>
-              <div className="space-y-4">
-                {getItems('takeaway').length > 0 ? (
-                  ['mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag', 'søndag', ''].map(day => {
-                    const dayItems = getItems('takeaway').filter(item => (item.day || '') === day);
-                    if (dayItems.length === 0) return null;
-                    const dayNames: Record<string, { da: string, en: string }> = {
-                      mandag: { da: 'MANDAG', en: 'MONDAY' },
-                      tirsdag: { da: 'TIRSDAG', en: 'TUESDAY' },
-                      onsdag: { da: 'ONSDAG', en: 'WEDNESDAY' },
-                      torsdag: { da: 'TORSDAG', en: 'THURSDAY' },
-                      fredag: { da: 'FREDAG', en: 'FRIDAY' },
-                      lørdag: { da: 'LØRDAG', en: 'SATURDAY' },
-                      søndag: { da: 'SØNDAG', en: 'SUNDAY' },
-                      '': { da: 'ALTID TILGÆNGELIG', en: 'ALWAYS AVAILABLE' },
-                    };
-                    return (
-                      <div key={day} className="mb-8">
-                        {day && <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-4 block uppercase border-b border-[#CDA235]/20 pb-2 inline-block">{language === 'da' ? dayNames[day].da : dayNames[day].en}</span>}
-                        {!day && <span className="text-[10px] font-bold text-gray-400 tracking-[0.4em] mb-4 block uppercase border-b border-gray-200 pb-2 inline-block">{language === 'da' ? dayNames[day].da : dayNames[day].en}</span>}
-                        {dayItems.map(item => (
-                          <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
-                        ))}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <>
-                    <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'TIRSDAG' : 'TUESDAY'}</span>
-                    <MenuItem name={tMenu.takeaway.tirsdag} price={tMenu.takeaway.tirsdagPrice} desc={tMenu.takeaway.tirsdagDesc} />
-                    <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'ONSDAG' : 'WEDNESDAY'}</span>
-                    <MenuItem name={tMenu.takeaway.onsdag} price={tMenu.takeaway.onsdagPrice} desc={tMenu.takeaway.onsdagDesc} />
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-          {activeTab === 'frokost' && (
-            <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
-              <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.tabs.frokost}</h3>
-              {getItems('frokost').length > 0 ? getItems('frokost').map(item => (
-                <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
-              )) : (
-                tMenu.frokostItems.map((item: any, i: number) => (
-                  <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
-                ))
+          ) : (
+            /* ── Fallback: legacy hardcoded content ── */
+            <>
+              {activeTab === 'alacarte' && (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-16 text-left animate-in fade-in duration-500">
+                  <div>
+                    <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.starters}</h3>
+                    {getItems('STARTERS').length > 0 ? getItems('STARTERS').map(item => (
+                      <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                    )) : (
+                      <>
+                        <MenuItem name={tMenu.items.soup} price="98,-" desc={tMenu.items.soupDesc} />
+                        <MenuItem name={tMenu.items.prawns} price="128,-" desc={tMenu.items.prawnsDesc} />
+                        <MenuItem name={tMenu.items.carpaccio} price="138,-" desc={tMenu.items.carpaccioDesc} />
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.main}</h3>
+                    {getItems('MAINS').length > 0 ? getItems('MAINS').map(item => (
+                      <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                    )) : (
+                      <>
+                        <MenuItem name={tMenu.items.fish} price="238,-" desc={tMenu.items.fishDesc} />
+                        <MenuItem name={tMenu.items.schnitzel} price="268,-" desc={tMenu.items.schnitzelDesc} />
+                        <MenuItem name={tMenu.items.duck} price="268,-" desc={tMenu.items.duckDesc} />
+                        <MenuItem name={tMenu.items.steak} price="378,-" desc={tMenu.items.steakDesc} />
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.categories.dessert}</h3>
+                    {getItems('DESSERTS').length > 0 ? getItems('DESSERTS').map(item => (
+                      <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                    )) : (
+                      <>
+                        <MenuItem name={tMenu.items.tart} price="98,-" desc={tMenu.items.tartDesc} />
+                        <MenuItem name={tMenu.items.cake} price="98,-" desc={tMenu.items.cakeDesc} />
+                        <MenuItem name={tMenu.items.brulee} price="98,-" desc={tMenu.items.bruleeDesc} />
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
-            </div>
-          )}
-          {activeTab === 'kids' && (
-            <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
-              <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.tabs.kids}</h3>
-              {getItems('kids').length > 0 ? getItems('kids').map(item => (
-                <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
-              )) : (
-                tMenu.kidsItems.map((item: any, i: number) => (
-                  <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
-                ))
+              {activeTab === 'takeaway' && (
+                <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
+                  <div className="text-center mb-12">
+                    <h3 className="text-2xl md:text-3xl serif text-[#1a1a1a] mb-2">T A K E A W A Y</h3>
+                    <p className="text-[#CDA235] font-bold tracking-[0.3em]">{tMenu.takeaway.phone}</p>
+                  </div>
+                  <div className="space-y-4">
+                    {getItems('TAKEAWAY').length > 0 ? (
+                      ['mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag', 'søndag', ''].map(day => {
+                        const dayItems = getItems('TAKEAWAY').filter(item => (item.day || '') === day);
+                        if (dayItems.length === 0) return null;
+                        const dayNames: Record<string, { da: string, en: string }> = {
+                          mandag: { da: 'MANDAG', en: 'MONDAY' },
+                          tirsdag: { da: 'TIRSDAG', en: 'TUESDAY' },
+                          onsdag: { da: 'ONSDAG', en: 'WEDNESDAY' },
+                          torsdag: { da: 'TORSDAG', en: 'THURSDAY' },
+                          fredag: { da: 'FREDAG', en: 'FRIDAY' },
+                          lørdag: { da: 'LØRDAG', en: 'SATURDAY' },
+                          søndag: { da: 'SØNDAG', en: 'SUNDAY' },
+                          '': { da: 'ALTID TILGÆNGELIG', en: 'ALWAYS AVAILABLE' },
+                        };
+                        return (
+                          <div key={day} className="mb-8">
+                            {day && <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-4 block uppercase border-b border-[#CDA235]/20 pb-2 inline-block">{language === 'da' ? dayNames[day].da : dayNames[day].en}</span>}
+                            {!day && <span className="text-[10px] font-bold text-gray-400 tracking-[0.4em] mb-4 block uppercase border-b border-gray-200 pb-2 inline-block">{language === 'da' ? dayNames[day].da : dayNames[day].en}</span>}
+                            {dayItems.map(item => (
+                              <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                            ))}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <>
+                        <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'TIRSDAG' : 'TUESDAY'}</span>
+                        <MenuItem name={tMenu.takeaway.tirsdag} price={tMenu.takeaway.tirsdagPrice} desc={tMenu.takeaway.tirsdagDesc} />
+                        <span className="text-[10px] font-bold text-[#CDA235] tracking-[0.4em] mb-2 uppercase">{language === 'da' ? 'ONSDAG' : 'WEDNESDAY'}</span>
+                        <MenuItem name={tMenu.takeaway.onsdag} price={tMenu.takeaway.onsdagPrice} desc={tMenu.takeaway.onsdagDesc} />
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
-            </div>
+              {activeTab === 'frokost' && (
+                <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
+                  <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.tabs.frokost}</h3>
+                  {getItems('FROKOST').length > 0 ? getItems('FROKOST').map(item => (
+                    <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                  )) : (
+                    tMenu.frokostItems.map((item: any, i: number) => (
+                      <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
+                    ))
+                  )}
+                </div>
+              )}
+              {activeTab === 'kids' && (
+                <div className="max-w-3xl mx-auto text-left animate-in fade-in duration-500">
+                  <h3 className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.5em] md:tracking-[0.6em] text-[#CDA235] mb-8 md:mb-12 border-l-4 border-[#CDA235] pl-4">{tMenu.tabs.kids}</h3>
+                  {getItems('KIDS').length > 0 ? getItems('KIDS').map(item => (
+                    <MenuItem key={item.id} name={item.name} price={item.price} desc={item.description} imageUrl={item.image_url} onClick={() => setSelectedDish(item)} />
+                  )) : (
+                    tMenu.kidsItems.map((item: any, i: number) => (
+                      <MenuItem key={i} name={item.name} price={item.price} desc={item.desc} />
+                    ))
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -538,20 +614,58 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
   const [events, setEvents] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
 
+  // ─── Availability state ───────────────────────────────────────────────
+  const [totalTables, setTotalTables] = useState(100);
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
+  const [dateWarning, setDateWarning] = useState<string | null>(null);
+
   React.useEffect(() => {
     supabase.from('reviews').select('*').eq('is_published', true).order('created_at', { ascending: false })
       .then(({ data }) => setReviews(data || []));
 
     supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(3)
-      .then(({ data }) => setEvents(data || []));
+      .then(async ({ data }) => {
+        if (data) {
+          const eventsWithSlugs = await Promise.all(data.map(async (event) => {
+            const { data: slugData } = await supabase.from('settings').select('value').eq('key', `event_seo_${event.id}_slug`).maybeSingle();
+            return { ...event, slug: slugData?.value };
+          }));
+          setEvents(eventsWithSlugs);
+        }
+      });
 
     supabase.from('settings').select('*')
       .then(({ data }) => {
         if (data) {
-          setSettings(data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {}));
+          const map = data.reduce((acc: Record<string, string>, curr: any) => ({ ...acc, [curr.key]: curr.value }), {});
+          setSettings(map);
+          if (map.total_tables) {
+            const v = parseInt(map.total_tables, 10);
+            if (!isNaN(v)) setTotalTables(v);
+          }
         }
       });
   }, []);
+
+  // Fetch per-slot booking counts whenever the date changes
+  const fetchSlotCounts = async (date: string) => {
+    setSlotCounts({});
+    if (!date) return;
+    try {
+      const { data } = await supabase
+        .from('bookings')
+        .select('time')
+        .eq('date', date)
+        .eq('status', 'confirmed');
+      if (data) {
+        const counts: Record<string, number> = {};
+        data.forEach((b: any) => { counts[b.time] = (counts[b.time] || 0) + 1; });
+        setSlotCounts(counts);
+      }
+    } catch (e) {
+      console.error('Failed to fetch slot counts:', e);
+    }
+  };
 
   const getTransSetting = (baseKey: string) => {
     const langKey = language === 'da' ? baseKey : `${baseKey}_${language}`;
@@ -583,14 +697,80 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const times = [
+  // ─── Time slot arrays ────────────────────────────────────────────────
+  const dinnerSlots = [
     '17:00', '17:30', '18:00', '18:30',
     '19:00', '19:30', '20:00', '20:30',
     '21:00', '21:30', '22:00', '22:30'
   ];
+  const lunchSlots = ['12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00'];
+
+  // Determine if selected date is a Saturday
+  const isSaturday = (() => {
+    if (!bookingData.date) return false;
+    const d = new Date(bookingData.date + 'T00:00:00');
+    return d.getDay() === 6;
+  })();
+
+  const times = isSaturday ? [...lunchSlots, ...dinnerSlots] : dinnerSlots;
+
+  // ─── Slot availability helper ────────────────────────────────────────
+  const isSlotDisabled = (slot: string): { disabled: boolean; reason: string } => {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const [h, m] = slot.split(':').map(Number);
+
+    // If selected date is today
+    if (bookingData.date === today) {
+      // Past time — already passed
+      const slotDate = new Date(now);
+      slotDate.setHours(h, m, 0, 0);
+      if (slotDate <= now) return { disabled: true, reason: 'past' };
+
+      // 5-hour advance rule
+      const fiveHoursFromNow = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+      if (slotDate < fiveHoursFromNow) {
+        return { disabled: true, reason: '5h' };
+      }
+    }
+
+    // Capacity check
+    const booked = slotCounts[slot] || 0;
+    if (booked >= totalTables) {
+      return { disabled: true, reason: 'full' };
+    }
+
+    return { disabled: false, reason: '' };
+  };
+
+  // ─── Date validation ─────────────────────────────────────────────────
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const handleDateChange = (value: string) => {
+    setDateWarning(null);
+    if (!value) {
+      setBookingData({ ...bookingData, date: '', time: '' });
+      return;
+    }
+    const d = new Date(value + 'T00:00:00');
+    const day = d.getDay(); // 0=Sun, 1=Mon
+    if (day === 0 || day === 1) {
+      setDateWarning(
+        language === 'da' ? 'Vi holder lukket søndag og mandag. Vælg venligst en anden dag.' :
+        language === 'de' ? 'Sonntag und Montag geschlossen. Bitte wählen Sie einen anderen Tag.' :
+        'We are closed on Sundays and Mondays. Please select another day.'
+      );
+      setBookingData({ ...bookingData, date: '', time: '' });
+      return;
+    }
+    setBookingData({ ...bookingData, date: value, time: '' });
+  };
 
   const handleInitialNext = () => {
-    if (bookingData.date) setBookingStep('time');
+    if (bookingData.date) {
+      fetchSlotCounts(bookingData.date);
+      setBookingStep('time');
+    }
   };
 
   const handleTimeNext = () => {
@@ -606,41 +786,33 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
       setIsSubmitting(true);
       setSubmitError(null);
       try {
-        const { error } = await supabase
-          .from('bookings')
-          .insert([
-            {
-              date: bookingData.date,
-              time: bookingData.time,
-              guests: bookingData.guests,
-              fullName: bookingData.fullName,
-              email: bookingData.email,
-              phone: bookingData.phone,
-              specialRequests: bookingData.specialRequests,
-              status: 'confirmed'
-            }
-          ]);
+        // ── All capacity checking, insertion, and emails happen server-side ──
+        const { data: result, error: fnError } = await supabase.functions.invoke('create-booking', {
+          body: {
+            date: bookingData.date,
+            time: bookingData.time,
+            guests: bookingData.guests,
+            fullName: bookingData.fullName,
+            email: bookingData.email,
+            phone: bookingData.phone,
+            specialRequests: bookingData.specialRequests,
+            language: language
+          }
+        });
 
-        if (error) throw error;
-        
-        // Trigger the automatic confirmation email to the user
-        try {
-            await supabase.functions.invoke('send-booking-email', {
-                body: {
-                    type: 'confirmation',
-                    name: bookingData.fullName,
-                    email: bookingData.email,
-                    date: bookingData.date,
-                    time: bookingData.time,
-                    guests: bookingData.guests,
-                    language: language
-                }
-            });
-        } catch (emailErr) {
-            console.error("Failed to send automatic email:", emailErr);
-            // Non-blocking error for the user
+        if (fnError) throw fnError;
+
+        if (!result?.success) {
+          // Server rejected the booking (capacity reached) — rejection email already sent server-side
+          setSubmitError(result?.error || (
+            language === 'da' ? 'Beklager, dette tidspunkt er nu fuldt booket. Vælg venligst et andet tidspunkt.' :
+            language === 'de' ? 'Leider ist dieser Zeitraum jetzt ausgebucht. Bitte wählen Sie eine andere Zeit.' :
+            'Sorry, this time slot is now fully booked. Please select a different time.'
+          ));
+          return;
         }
 
+        // Success — confirmation email already sent server-side
         onBookingConfirmed(bookingData);
         setBookingStep('success');
       } catch (err: any) {
@@ -662,10 +834,14 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                 <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-gray-400 mb-3 md:mb-4 ml-1">{tBook.date} *</span>
                 <input
                   type="date"
+                  min={todayStr}
                   value={bookingData.date}
-                  onChange={(e) => setBookingData({ ...bookingData, date: e.target.value })}
+                  onChange={(e) => handleDateChange(e.target.value)}
                   className="bg-[#faf9f6] border border-gray-100 p-4 md:p-6 text-base text-[#1a1a1a] outline-none focus:border-[#CDA235] transition-all h-14 md:h-16 serif italic"
                 />
+                {dateWarning && (
+                  <p className="text-red-500 text-[11px] mt-2 italic font-medium">{dateWarning}</p>
+                )}
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-gray-400 mb-3 md:mb-4 ml-1">{tBook.guests} *</span>
@@ -722,19 +898,34 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-10">
-                  {times.map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setBookingData({ ...bookingData, time })}
-                      className={`py-6 px-4 border-2 transition-all duration-400 flex flex-col items-center gap-1 ${time === bookingData.time
-                        ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xl scale-[1.02]'
-                        : 'bg-white border-gray-50 text-[#1a1a1a] hover:border-[#CDA235]'
+                  {times.map((time) => {
+                    const { disabled, reason } = isSlotDisabled(time);
+                    const isSelected = time === bookingData.time;
+                    const fullLabel = language === 'da' ? 'FULDT' : language === 'de' ? 'VOLL' : 'FULL';
+                    return (
+                      <button
+                        key={time}
+                        onClick={() => !disabled && setBookingData({ ...bookingData, time })}
+                        disabled={disabled}
+                        className={`py-6 px-4 border-2 transition-all duration-400 flex flex-col items-center gap-1 ${
+                          disabled
+                            ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed opacity-40'
+                            : isSelected
+                              ? 'bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xl scale-[1.02]'
+                              : 'bg-white border-gray-50 text-[#1a1a1a] hover:border-[#CDA235]'
                         }`}
-                    >
-                      <span className="text-xl serif font-medium italic">{time}</span>
-                      <span className={`text-[8px] tracking-[0.3em] uppercase font-bold ${time === bookingData.time ? 'text-[#CDA235]' : 'text-gray-300'}`}>{tFlow.available}</span>
-                    </button>
-                  ))}
+                      >
+                        <span className="text-xl serif font-medium italic">{time}</span>
+                        <span className={`text-[8px] tracking-[0.3em] uppercase font-bold ${
+                          disabled
+                            ? (reason === 'full' ? 'text-red-400' : 'text-gray-300')
+                            : isSelected ? 'text-[#CDA235]' : 'text-gray-300'
+                        }`}>
+                          {disabled ? (reason === 'full' ? fullLabel : '—') : tFlow.available}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="flex flex-col items-center gap-6 border-t border-gray-100 pt-10">
@@ -843,7 +1034,13 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                       onChange={(e) => setPrivacyAccepted(e.target.checked)}
                     />
                     <label htmlFor="privacy" className="text-[12px] text-gray-400 leading-relaxed font-light cursor-pointer">
-                      {tFlow.privacyAgree}
+                      {language === 'da' ? (
+                        <>Jeg accepterer <a href="/privatlivspolitik" target="_blank" rel="noopener noreferrer" className="text-[#CDA235] underline hover:text-[#1a1a1a] transition-colors">privatlivspolitikken</a>. *</>
+                      ) : language === 'de' ? (
+                        <>Ich akzeptiere die <a href="/privatlivspolitik" target="_blank" rel="noopener noreferrer" className="text-[#CDA235] underline hover:text-[#1a1a1a] transition-colors">Datenschutzbestimmungen</a>. *</>
+                      ) : (
+                        <>I accept the <a href="/privatlivspolitik" target="_blank" rel="noopener noreferrer" className="text-[#CDA235] underline hover:text-[#1a1a1a] transition-colors">privacy policy</a>. *</>
+                      )}
                     </label>
                   </div>
                 </div>
@@ -932,7 +1129,24 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                 >
                   {language === 'da' ? 'NY RESERVATION' : 'NEW RESERVATION'}
                 </button>
-                <button className="flex-1 border border-gray-200 text-[#1a1a1a] px-8 py-5 text-[9px] font-bold uppercase tracking-[0.4em] hover:bg-white transition-all">
+                <button
+                  onClick={async () => {
+                    const shareText = `${language === 'da' ? 'Reservation hos Bag Søjlen' : 'Reservation at Bag Søjlen'}\n${tConf.date}: ${bookingData.date}\n${tConf.arrival}: ${bookingData.time}\n${tConf.guests}: ${bookingData.guests} ${language === 'da' ? 'Gæster' : 'Guests'}\n${tConf.reservedBy}: ${bookingData.fullName}`;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title: 'Bag Søjlen — Reservation', text: shareText });
+                      } catch (e) { /* user cancelled share */ }
+                    } else {
+                      try {
+                        await navigator.clipboard.writeText(shareText);
+                        alert(language === 'da' ? 'Reservation kopieret til udklipsholder!' : 'Reservation copied to clipboard!');
+                      } catch (e) {
+                        alert(shareText);
+                      }
+                    }
+                  }}
+                  className="flex-1 border border-gray-200 text-[#1a1a1a] px-8 py-5 text-[9px] font-bold uppercase tracking-[0.4em] hover:bg-white transition-all"
+                >
                   {tConf.share}
                 </button>
               </div>
@@ -973,14 +1187,14 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
       </section>
 
       {/* Quote Section */}
-      <section className="py-20 md:py-32 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
+      <section className="py-14 md:py-20 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 text-[#1a1a1a]">
           <span className="text-5xl md:text-7xl serif text-[#CDA235]/10 block mb-8 md:mb-12 select-none opacity-50">“</span>
 
-          <div className="relative min-h-[140px] md:min-h-[100px] flex items-center justify-center">
+          <div className="relative min-h-[100px] md:min-h-[80px] flex items-center justify-center">
             {reviews.length > 0 ? (
               <div key={currentReviewIndex} className="animate-in fade-in slide-in-from-right-4 duration-700 absolute w-full inset-0 flex flex-col items-center justify-center">
-                <h2 className="text-2xl md:text-4xl lg:text-5xl serif italic font-light leading-tight mb-10 md:mb-16 px-0 lg:px-10 tracking-tight">
+                <h2 className="text-lg md:text-2xl lg:text-3xl serif italic font-light leading-tight mb-6 md:mb-10 px-0 lg:px-10 tracking-tight">
                   "{language === 'da' ? reviews[currentReviewIndex].content : (reviews[currentReviewIndex][`content_${language}`] || reviews[currentReviewIndex].content)}"
                 </h2>
                 <div className="flex flex-col items-center gap-4">
@@ -991,7 +1205,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
               </div>
             ) : (
               <div className="w-full flex flex-col items-center justify-center">
-                <h2 className="text-2xl md:text-4xl lg:text-5xl serif italic font-light leading-tight mb-10 md:mb-16 px-0 lg:px-10 tracking-tight">
+                <h2 className="text-lg md:text-2xl lg:text-3xl serif italic font-light leading-tight mb-6 md:mb-10 px-0 lg:px-10 tracking-tight">
                   {translations[language].philosophy.quote}
                 </h2>
                 <div className="flex flex-col items-center gap-4">
@@ -1005,7 +1219,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
 
           {/* Carousel Indicators */}
           {reviews.length > 1 && (
-            <div className="flex justify-center gap-2 mt-20">
+            <div className="flex justify-center gap-2 mt-12">
               {reviews.map((_, i) => (
                 <button
                   key={i}
@@ -1033,7 +1247,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
           {events.length > 0 ? events.map((event, i) => (
             <div
               key={event.id}
-              onClick={() => onNavigateToEvent?.(event.id)}
+              onClick={() => onNavigateToEvent?.(event.slug || event.id)}
               className="group cursor-pointer w-full"
             >
               <div

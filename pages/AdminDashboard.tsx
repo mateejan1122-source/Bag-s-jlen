@@ -17,18 +17,16 @@ import { HistoryTab } from './admin/HistoryTab';
 import { DashboardOverviewTab } from './admin/DashboardOverviewTab';
 import { NewsletterTab } from './admin/NewsletterTab';
 import { ChatTab } from './admin/ChatTab';
+import { FooterTab } from './admin/FooterTab';
 import { Bell } from 'lucide-react';
 
-type AdminTab = 'overview' | 'reservations' | 'menu' | 'history' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'newsletter' | 'settings' | 'appearance' | 'chat';
+type AdminTab = 'overview' | 'reservations' | 'menu' | 'history' | 'pages' | 'content' | 'events' | 'gallery' | 'marketing' | 'newsletter' | 'settings' | 'appearance' | 'chat' | 'footer';
 
 export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) => {
-    const [isAuthenticated, setIsAuthenticated] = useState(() => {
-        return sessionStorage.getItem('adminAuth') === 'true';
-    });
-    const [userRole, setUserRole] = useState<'admin' | 'editor'>(() => {
-        return (sessionStorage.getItem('adminRole') as 'admin' | 'editor') || 'admin';
-    });
-    const [username, setUsername] = useState('');
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [userRole, setUserRole] = useState<'admin' | 'editor'>('admin');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<AdminTab>('overview');
@@ -53,34 +51,35 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
     // UI States
     const [loading, setLoading] = useState(false);
 
+    // Check existing Supabase Auth session on mount
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setIsAuthenticated(!!session);
+            setAuthLoading(false);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setIsAuthenticated(!!session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        setError('');
         try {
-            // Fetch credentials from settings
-            const { data: settingsData } = await supabase.from('settings').select('*').in('key', ['admin_username', 'admin_password']);
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password,
+            });
 
-            let currentUsername = 'admin'; // fallback
-            let currentPassword = '8410'; // fallback
-
-            if (settingsData) {
-                const dbUser = settingsData.find(s => s.key === 'admin_username')?.value;
-                const dbPass = settingsData.find(s => s.key === 'admin_password')?.value;
-                if (dbUser) currentUsername = dbUser;
-                if (dbPass) currentPassword = dbPass;
-            }
-
-            if (username === currentUsername && password === currentPassword) {
-                setUserRole('admin');
-                setIsAuthenticated(true);
-                sessionStorage.setItem('adminAuth', 'true');
-                sessionStorage.setItem('adminRole', 'admin');
-                setError('');
-                fetchData();
-            } else {
-                setError(language === 'da' ? 'Forkert brugernavn eller adgangskode' : 'Incorrect username or password');
+            if (authError) {
+                setError(language === 'da' ? 'Forkert e-mail eller adgangskode' : 'Incorrect email or password');
                 setPassword('');
             }
+            // onAuthStateChange will set isAuthenticated=true automatically
         } catch (err) {
             setError('Login failed');
         } finally {
@@ -88,11 +87,9 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
         }
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
         setIsAuthenticated(false);
-        setUserRole('admin');
-        sessionStorage.removeItem('adminAuth');
-        sessionStorage.removeItem('adminRole');
     };
 
     const fetchData = () => {
@@ -154,6 +151,14 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
         return () => document.removeEventListener('mousedown', handleDocClick);
     }, []);
 
+    if (authLoading) {
+        return (
+            <div className="bg-[#FAF9F6] min-h-[800px] py-32 px-8 flex flex-col items-center justify-center -mt-[80px]">
+                <div className="text-gray-400 text-[12px] uppercase tracking-[0.4em] font-bold">Loading...</div>
+            </div>
+        );
+    }
+
     if (!isAuthenticated) {
         return (
             <div className="bg-[#FAF9F6] min-h-[800px] py-32 px-8 flex flex-col items-center justify-center -mt-[80px]">
@@ -165,10 +170,10 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     <form onSubmit={handleLogin} className="space-y-6">
                         <div className="flex flex-col gap-4">
                             <input
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                placeholder="Username..."
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Email..."
                                 autoCapitalize="none"
                                 className="border-b border-gray-200 py-4 text-center text-xl outline-none focus:border-[#CDA235] serif bg-transparent"
                             />
@@ -183,10 +188,10 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                         {error && <p className="text-red-500 text-xs italic mt-2">{error}</p>}
                         <button
                             type="submit"
-                            disabled={!username || password.length < 3}
-                            className={`w-full py-6 mt-6 text-[11px] font-bold uppercase tracking-[0.5em] transition-all shadow-xl ${(!username || password.length < 3) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#1a1a1a] text-white hover:bg-[#CDA235]'}`}
+                            disabled={!email || password.length < 3 || loading}
+                            className={`w-full py-6 mt-6 text-[11px] font-bold uppercase tracking-[0.5em] transition-all shadow-xl ${(!email || password.length < 3) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#1a1a1a] text-white hover:bg-[#CDA235]'}`}
                         >
-                            Enter Dashboard
+                            {loading ? 'Signing in...' : 'Enter Dashboard'}
                         </button>
                     </form>
                 </div>
@@ -373,6 +378,13 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     {userRole === 'admin' && (
                         <>
                             <button
+                                onClick={() => { setActiveTab('footer'); setIsSidebarOpen(false); }}
+                                className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'footer' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                            >
+                                <LayoutDashboard size={18} />
+                                <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Footer</span>
+                            </button>
+                            <button
                                 onClick={() => { setActiveTab('appearance'); setIsSidebarOpen(false); }}
                                 className={`w-full flex items-center gap-4 px-4 py-3 text-left transition-colors rounded-sm ${activeTab === 'appearance' ? 'bg-[#CDA235] text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                             >
@@ -418,6 +430,7 @@ export const AdminDashboard: React.FC<{ language: Language }> = ({ language }) =
                     {activeTab === 'marketing' && <MarketingTab />}
                     {activeTab === 'newsletter' && <NewsletterTab />}
                     {activeTab === 'chat' && <ChatTab />}
+                    {activeTab === 'footer' && userRole === 'admin' && <FooterTab />}
                     {activeTab === 'appearance' && userRole === 'admin' && <AppearanceTab />}
                     {activeTab === 'settings' && userRole === 'admin' && <SettingsTab />}
                 </div>

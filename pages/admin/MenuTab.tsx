@@ -1,15 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit3, Trash2, GripVertical, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit3, Trash2, GripVertical, Image as ImageIcon, ChevronDown, ChevronUp, FolderPlus } from 'lucide-react';
+
+interface MenuCategory {
+    id: string;
+    name: string;
+    display_order: number;
+    is_visible: boolean;
+}
+
+const DEFAULT_CATEGORIES: MenuCategory[] = [
+    { id: 'STARTERS', name: 'A La Carte - Starters', display_order: 0, is_visible: true },
+    { id: 'MAINS', name: 'A La Carte - Mains', display_order: 1, is_visible: true },
+    { id: 'DESSERTS', name: 'A La Carte - Desserts', display_order: 2, is_visible: true },
+    { id: 'SIDES', name: 'A La Carte - Sides', display_order: 3, is_visible: true },
+    { id: 'FROKOST', name: 'Frokost (Lunch)', display_order: 4, is_visible: true },
+    { id: 'TAKEAWAY', name: 'Takeaway', display_order: 5, is_visible: true },
+    { id: 'KIDS', name: 'Kids Menu', display_order: 6, is_visible: true },
+    { id: 'DRINKS', name: 'Drinks / Other', display_order: 7, is_visible: true },
+];
 
 export const MenuTab: React.FC = () => {
     const [menuItems, setMenuItems] = useState<any[]>([]);
+    const [categories, setCategories] = useState<MenuCategory[]>(DEFAULT_CATEGORIES);
     const [loading, setLoading] = useState(false);
 
+    // --- Category management state ---
+    const [showCategoryManager, setShowCategoryManager] = useState(false);
+    const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
+    const [newCategoryName, setNewCategoryName] = useState('');
+
+    // --- Dish editing state ---
     const [isEditing, setIsEditing] = useState(false);
     const [editingItem, setEditingItem] = useState({
         id: '',
-        category: 'STARTERS', // Default category
+        category: '',
         name: '',
         description: '',
         price: '',
@@ -22,9 +47,97 @@ export const MenuTab: React.FC = () => {
     const [uploadingImage, setUploadingImage] = useState(false);
 
     useEffect(() => {
+        fetchCategories();
         fetchMenu();
     }, []);
 
+    // ─── Category persistence via settings table ────────────────────────
+    const fetchCategories = async () => {
+        try {
+            const { data } = await supabase
+                .from('settings')
+                .select('*')
+                .eq('key', 'menu_categories')
+                .maybeSingle();
+
+            if (data && data.value) {
+                try {
+                    const parsed = JSON.parse(data.value);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setCategories(parsed);
+                        return;
+                    }
+                } catch { /* fallback to defaults */ }
+            }
+            setCategories(DEFAULT_CATEGORIES);
+        } catch (err) {
+            console.error('Error fetching categories:', err);
+            setCategories(DEFAULT_CATEGORIES);
+        }
+    };
+
+    const saveCategories = async (cats: MenuCategory[]) => {
+        try {
+            const { error } = await supabase
+                .from('settings')
+                .upsert({ key: 'menu_categories', value: JSON.stringify(cats), category: 'general' }, { onConflict: 'key' });
+            if (error) throw error;
+            setCategories(cats);
+        } catch (err: any) {
+            console.error('Error saving categories:', err);
+            alert(`Failed to save categories: ${err.message}`);
+        }
+    };
+
+    const handleAddCategory = async () => {
+        if (!newCategoryName.trim()) return;
+        const id = newCategoryName.trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+        if (categories.find(c => c.id === id)) {
+            alert('A category with this ID already exists.');
+            return;
+        }
+        const newCat: MenuCategory = {
+            id,
+            name: newCategoryName.trim(),
+            display_order: categories.length,
+            is_visible: true
+        };
+        await saveCategories([...categories, newCat]);
+        setNewCategoryName('');
+    };
+
+    const handleDeleteCategory = async (catId: string) => {
+        const itemsInCat = menuItems.filter(i => i.category === catId);
+        if (itemsInCat.length > 0) {
+            if (!confirm(`This menu "${catId}" has ${itemsInCat.length} dish(es). Deleting the menu will NOT delete the dishes, but they will become uncategorized. Continue?`)) return;
+        } else {
+            if (!confirm(`Delete menu "${catId}"?`)) return;
+        }
+        await saveCategories(categories.filter(c => c.id !== catId));
+    };
+
+    const handleUpdateCategory = async (cat: MenuCategory) => {
+        await saveCategories(categories.map(c => c.id === cat.id ? cat : c));
+        setEditingCategory(null);
+    };
+
+    const handleMoveCategoryUp = async (index: number) => {
+        if (index <= 0) return;
+        const newCats = [...categories];
+        [newCats[index - 1], newCats[index]] = [newCats[index], newCats[index - 1]];
+        newCats.forEach((c, i) => c.display_order = i);
+        await saveCategories(newCats);
+    };
+
+    const handleMoveCategoryDown = async (index: number) => {
+        if (index >= categories.length - 1) return;
+        const newCats = [...categories];
+        [newCats[index], newCats[index + 1]] = [newCats[index + 1], newCats[index]];
+        newCats.forEach((c, i) => c.display_order = i);
+        await saveCategories(newCats);
+    };
+
+    // ─── Menu items ─────────────────────────────────────────────────────
     const fetchMenu = async () => {
         setLoading(true);
         try {
@@ -53,14 +166,12 @@ export const MenuTab: React.FC = () => {
             const fileName = `${Math.random()}.${fileExt}`;
             const filePath = `menu/${fileName}`;
 
-            // Upload the image to 'public-images' storage bucket
             const { error: uploadError } = await supabase.storage
                 .from('public-images')
                 .upload(filePath, file);
 
             if (uploadError) throw uploadError;
 
-            // Get public URL
             const { data: { publicUrl } } = supabase.storage
                 .from('public-images')
                 .getPublicUrl(filePath);
@@ -116,6 +227,7 @@ export const MenuTab: React.FC = () => {
         }
     };
 
+    // ─── Dish Edit Form ─────────────────────────────────────────────────
     if (isEditing) {
         return (
             <div className="bg-white p-8 border border-gray-100 shadow-xl max-w-3xl animate-in fade-in">
@@ -127,16 +239,12 @@ export const MenuTab: React.FC = () => {
                             <input required type="text" value={editingItem.name} onChange={e => setEditingItem({ ...editingItem, name: e.target.value })} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors" placeholder="e.g. Steak Frites" />
                         </div>
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Category</label>
+                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Menu / Category</label>
                             <select value={editingItem.category} onChange={e => setEditingItem({ ...editingItem, category: e.target.value })} className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors bg-white">
-                                <option value="STARTERS">A La Carte - Starters</option>
-                                <option value="MAINS">A La Carte - Mains</option>
-                                <option value="DESSERTS">A La Carte - Desserts</option>
-                                <option value="SIDES">A La Carte - Sides</option>
-                                <option value="FROKOST">Frokost (Lunch)</option>
-                                <option value="TAKEAWAY">Takeaway</option>
-                                <option value="KIDS">Kids Menu</option>
-                                <option value="DRINKS">Drinks / Other</option>
+                                <option value="">-- Select Menu --</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
@@ -211,8 +319,8 @@ export const MenuTab: React.FC = () => {
             </div>
         );
     }
-    const categories = ['STARTERS', 'MAINS', 'DESSERTS', 'SIDES', 'FROKOST', 'TAKEAWAY', 'KIDS', 'DRINKS'];
 
+    // ─── Main View ──────────────────────────────────────────────────────
     return (
         <div className="space-y-8 animate-in fade-in duration-300">
             <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-[#CDA235]/20 pb-8">
@@ -220,62 +328,158 @@ export const MenuTab: React.FC = () => {
                     <span className="text-[#CDA235] text-[11px] font-bold tracking-[0.5em] uppercase block mb-2">RESTAURANT</span>
                     <h1 className="text-4xl md:text-5xl serif italic text-[#1a1a1a]">Menu Management</h1>
                 </div>
-                <button
-                    onClick={() => {
-                        setEditingItem({ id: '', category: 'STARTERS', name: '', description: '', price: '', image_url: '', display_order: 0, is_visible: true, day: '' });
-                        setIsEditing(true);
-                    }}
-                    className="bg-[#1a1a1a] text-white px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#CDA235] transition-colors flex items-center gap-2 mt-4 md:mt-0"
-                >
-                    <Plus size={14} /> Add Dish
-                </button>
+                <div className="flex gap-3 mt-4 md:mt-0">
+                    <button
+                        onClick={() => setShowCategoryManager(!showCategoryManager)}
+                        className="border border-gray-200 text-gray-700 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:border-[#CDA235] hover:text-[#CDA235] transition-colors flex items-center gap-2"
+                    >
+                        <FolderPlus size={14} /> Manage Menus
+                    </button>
+                    <button
+                        onClick={() => {
+                            setEditingItem({ id: '', category: categories[0]?.id || 'STARTERS', name: '', description: '', price: '', image_url: '', display_order: 0, is_visible: true, day: '' });
+                            setIsEditing(true);
+                        }}
+                        className="bg-[#1a1a1a] text-white px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#CDA235] transition-colors flex items-center gap-2"
+                    >
+                        <Plus size={14} /> Add Dish
+                    </button>
+                </div>
             </div>
 
+            {/* ── Menu Category Manager ─────────────────────────────────── */}
+            {showCategoryManager && (
+                <div className="bg-white shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-gray-100 p-8 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl serif italic text-[#1a1a1a]">Menu Categories</h3>
+                        <button onClick={() => setShowCategoryManager(false)} className="text-gray-400 hover:text-gray-600 text-sm">✕ Close</button>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-6 font-light">Add, edit, reorder, or delete menu categories. These will appear as tabs on the frontend.</p>
+
+                    <div className="space-y-3 mb-8">
+                        {categories.map((cat, index) => (
+                            <div key={cat.id} className="flex items-center gap-3 p-4 border border-gray-100 bg-[#faf9f6] hover:border-[#CDA235]/30 transition-colors group">
+                                <div className="flex flex-col gap-1">
+                                    <button onClick={() => handleMoveCategoryUp(index)} disabled={index === 0} className="text-gray-300 hover:text-[#CDA235] disabled:opacity-20 transition-colors"><ChevronUp size={14} /></button>
+                                    <button onClick={() => handleMoveCategoryDown(index)} disabled={index === categories.length - 1} className="text-gray-300 hover:text-[#CDA235] disabled:opacity-20 transition-colors"><ChevronDown size={14} /></button>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    {editingCategory?.id === cat.id ? (
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="text"
+                                                value={editingCategory.name}
+                                                onChange={e => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                                                className="flex-1 text-base border-b border-[#CDA235] py-1 focus:outline-none bg-transparent"
+                                                autoFocus
+                                            />
+                                            <button onClick={() => handleUpdateCategory(editingCategory)} className="text-[9px] bg-[#CDA235] text-white px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black transition-colors">Save</button>
+                                            <button onClick={() => setEditingCategory(null)} className="text-[9px] text-gray-400 hover:text-gray-700">Cancel</button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-[#1a1a1a]">{cat.name}</span>
+                                            <span className="text-[9px] text-gray-400 font-mono uppercase">{cat.id}</span>
+                                            <span className="text-[9px] text-gray-400">({menuItems.filter(i => i.category === cat.id).length} dishes)</span>
+                                            {!cat.is_visible && <span className="text-[8px] font-bold uppercase tracking-widest text-orange-500 bg-orange-50 px-2 py-0.5 border border-orange-200">Hidden</span>}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => setEditingCategory(cat)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"><Edit3 size={14} /></button>
+                                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={14} /></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add new category */}
+                    <div className="flex items-center gap-3 pt-6 border-t border-gray-100">
+                        <input
+                            type="text"
+                            value={newCategoryName}
+                            onChange={e => setNewCategoryName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                            className="flex-1 text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors"
+                            placeholder="New menu name (e.g. Seasonal Menu, Wine List)"
+                        />
+                        <button
+                            onClick={handleAddCategory}
+                            disabled={!newCategoryName.trim()}
+                            className="bg-[#1a1a1a] text-white px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#CDA235] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            Add Menu
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Dishes by Category ───────────────────────────────────── */}
             {loading && menuItems.length === 0 ? (
                 <div className="text-center py-16 text-gray-400 text-[12px] uppercase tracking-[0.4em] font-bold">Loading Menu...</div>
             ) : (
                 <div className="space-y-12">
-                    {categories.map(category => {
-                        const itemsInCategory = menuItems.filter(i => i.category === category);
-                        if (itemsInCategory.length === 0) return null;
+                    {categories.map(cat => {
+                        const itemsInCategory = menuItems.filter(i => i.category === cat.id);
+                        if (itemsInCategory.length === 0 && !showCategoryManager) return null;
 
                         return (
-                            <div key={category} className="bg-white shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100 p-8">
-                                <h3 className="text-lg font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-6">{category}</h3>
-                                <div className="space-y-4">
-                                    {itemsInCategory.map(item => (
-                                        <div key={item.id} className={`flex items-center gap-4 p-4 border transition-colors ${item.is_visible ? 'border-gray-100 bg-white hover:bg-[#faf9f6]' : 'border-dashed border-gray-300 bg-gray-50 opacity-75'}`}>
-                                            <div className="text-gray-400 cursor-move"><GripVertical size={20} /></div>
-                                            <div className="w-16 h-16 bg-gray-100 border border-gray-200 overflow-hidden flex-shrink-0">
-                                                {item.image_url ? (
-                                                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageIcon size={20} /></div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-3">
-                                                    <h4 className="serif italic text-xl text-[#1a1a1a] truncate">{item.name}</h4>
-                                                    {!item.is_visible && <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500 bg-orange-50 px-2 py-0.5 border border-orange-200">Hidden / Draft</span>}
-                                                    {item.day && <span className="text-[9px] font-bold uppercase tracking-widest text-[#CDA235] bg-[#CDA235]/10 px-2 py-0.5 border border-[#CDA235]/20">{item.day}</span>}
-                                                </div>
-                                                <p className="text-sm text-gray-500 truncate">{item.description}</p>
-                                            </div>
-                                            <div className="font-bold text-[#1a1a1a] w-24 text-right">
-                                                {item.price}
-                                            </div>
-                                            <div className="flex gap-2 border-l border-gray-100 pl-4 ml-4">
-                                                <button onClick={() => { setEditingItem(item); setIsEditing(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"><Edit3 size={18} /></button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={18} /></button>
-                                            </div>
-                                        </div>
-                                    ))}
+                            <div key={cat.id} className={`bg-white shadow-[0_20px_40px_rgba(0,0,0,0.03)] border border-gray-100 p-8 ${!cat.is_visible ? 'opacity-60 border-dashed' : ''}`}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-lg font-bold tracking-[0.3em] uppercase text-[#CDA235]">{cat.name}</h3>
+                                        {!cat.is_visible && <span className="text-[8px] font-bold uppercase tracking-widest text-orange-500 bg-orange-50 px-2 py-0.5 border border-orange-200">Hidden</span>}
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setEditingItem({ id: '', category: cat.id, name: '', description: '', price: '', image_url: '', display_order: itemsInCategory.length, is_visible: true, day: '' });
+                                            setIsEditing(true);
+                                        }}
+                                        className="text-[9px] font-bold uppercase tracking-widest text-[#CDA235] hover:text-[#1a1a1a] transition-colors flex items-center gap-1"
+                                    >
+                                        <Plus size={12} /> Add dish here
+                                    </button>
                                 </div>
+                                {itemsInCategory.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {itemsInCategory.map(item => (
+                                            <div key={item.id} className={`flex items-center gap-4 p-4 border transition-colors ${item.is_visible ? 'border-gray-100 bg-white hover:bg-[#faf9f6]' : 'border-dashed border-gray-300 bg-gray-50 opacity-75'}`}>
+                                                <div className="text-gray-400 cursor-move"><GripVertical size={20} /></div>
+                                                <div className="w-16 h-16 bg-gray-100 border border-gray-200 overflow-hidden flex-shrink-0">
+                                                    {item.image_url ? (
+                                                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageIcon size={20} /></div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3">
+                                                        <h4 className="serif italic text-xl text-[#1a1a1a] truncate">{item.name}</h4>
+                                                        {!item.is_visible && <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500 bg-orange-50 px-2 py-0.5 border border-orange-200">Hidden / Draft</span>}
+                                                        {item.day && <span className="text-[9px] font-bold uppercase tracking-widest text-[#CDA235] bg-[#CDA235]/10 px-2 py-0.5 border border-[#CDA235]/20">{item.day}</span>}
+                                                    </div>
+                                                    <p className="text-sm text-gray-500 truncate">{item.description}</p>
+                                                </div>
+                                                <div className="font-bold text-[#1a1a1a] w-24 text-right">
+                                                    {item.price}
+                                                </div>
+                                                <div className="flex gap-2 border-l border-gray-100 pl-4 ml-4">
+                                                    <button onClick={() => { setEditingItem(item); setIsEditing(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-full transition-colors"><Edit3 size={18} /></button>
+                                                    <button onClick={() => handleDelete(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={18} /></button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="py-8 text-center text-gray-300 text-[11px] uppercase tracking-[0.3em] font-bold italic border border-dashed border-gray-200">
+                                        No dishes yet — click "Add dish here" above
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
 
-                    {menuItems.length === 0 && (
+                    {menuItems.length === 0 && !showCategoryManager && (
                         <div className="py-24 text-center text-gray-400 text-[12px] uppercase tracking-[0.2em] font-bold italic bg-white border border-gray-100">
                             Menu is empty. Add your first dish.
                         </div>

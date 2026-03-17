@@ -127,26 +127,26 @@ export const ReservationsTab: React.FC = () => {
                 }
             } else {
                 const { id, ...newData } = editingBooking;
-                const { error } = await supabase.from('bookings').insert([newData]);
-                if (error) throw error;
-
-                if (newData.status === 'confirmed' && newData.email) {
-                     try {
-                         await supabase.functions.invoke('send-booking-email', {
-                             body: {
-                                 type: 'confirmation',
-                                 name: newData.fullName,
-                                 email: newData.email,
-                                 date: newData.date,
-                                 time: newData.time,
-                                 guests: newData.guests,
-                                 language: 'da'
-                             }
-                         });
-                     } catch (err) {
-                         console.error("Failed to send creation confirmation email:", err);
-                     }
+                // Route through create-booking edge function for limit enforcement
+                const { data: result, error: fnError } = await supabase.functions.invoke('create-booking', {
+                    body: {
+                        date: newData.date,
+                        time: newData.time,
+                        guests: newData.guests,
+                        fullName: newData.fullName,
+                        email: newData.email || '',
+                        phone: newData.phone || '',
+                        specialRequests: newData.specialRequests || '',
+                        language: 'da'
+                    }
+                });
+                if (fnError) throw fnError;
+                if (!result?.success) {
+                    alert(result?.error || 'This time slot is fully booked. Cannot add more reservations.');
+                    setLoading(false);
+                    return;
                 }
+                // Confirmation email already sent by the edge function
             }
             setIsEditing(false);
             fetchBookings();

@@ -21,7 +21,9 @@ export const ContentTab: React.FC = () => {
         setLoading(false);
     };
 
-
+    useEffect(() => {
+        fetchSettings();
+    }, []);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();

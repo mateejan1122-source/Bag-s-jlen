@@ -19,21 +19,27 @@ export const EventsTab: React.FC = () => {
         description: '',
         description_en: '',
         description_de: '',
+        start_date: '',
         end_date: '',
         image_url: '',
         is_published: true,
+        // SEO fields — stored in settings table, NOT in events table
+        meta_title: '',
+        meta_description: '',
+        slug: '',
+        og_image_url: '',
         details: {
             top_tag: 'BEGIVENHED',
             hero_date: '',
             paragraph_1: '',
             paragraph_2: '',
-            info_title: 'MENUEN BYDER BLANDT ANDET PÅ:',
+            info_title: 'MENUEN BYDER BLANDT ANDET P\u00c5:',
             bullet_points: '',
             paragraph_3: '',
             price_text: '',
             booking_btn_text: 'BESTIL BORD TIL ARRANGEMENTET',
             time_text: '',
-            location_text: 'Restaurant Bag Søjlen\nHovedgaden 5, 8410 Rønde'
+            location_text: 'Restaurant Bag S\u00f8jlen\nHovedgaden 5, 8410 R\u00f8nde'
         },
         details_en: {},
         details_de: {}
@@ -246,21 +252,41 @@ export const EventsTab: React.FC = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            // Nullify empty dates
+            // Strip SEO fields — they are NOT columns in the events table.
+            // They are stored separately in the settings table keyed by event ID.
+            const { meta_title, meta_description, slug, og_image_url, ...eventFields } = editingItem;
+
             const payload = {
-                ...editingItem,
-                start_date: editingItem.start_date || null,
-                end_date: editingItem.end_date || null,
+                ...eventFields,
+                start_date: eventFields.start_date || null,
+                end_date: eventFields.end_date || null,
             };
+
+            let savedId = editingItem.id;
 
             if (editingItem.id) {
                 const { error } = await supabase.from('events').update(payload).eq('id', editingItem.id);
                 if (error) throw error;
             } else {
                 const { id, ...newItem } = payload;
-                const { error } = await supabase.from('events').insert([newItem]);
+                const { data: inserted, error } = await supabase.from('events').insert([newItem]).select('id').single();
                 if (error) throw error;
+                savedId = inserted?.id || '';
             }
+
+            // Save SEO metadata to settings table, keyed by event ID
+            if (savedId) {
+                const effectiveTitle = meta_title || editingItem.title || '';
+                const seoEntries = [
+                    { key: `event_seo_${savedId}_meta_title`, value: effectiveTitle },
+                    { key: `event_seo_${savedId}_meta_description`, value: meta_description || '' },
+                    { key: `event_seo_${savedId}_slug`, value: slug || '' },
+                    { key: `event_seo_${savedId}_og_image_url`, value: og_image_url || '' },
+                ].map(e => ({ ...e, category: 'seo' }));
+
+                await supabase.from('settings').upsert(seoEntries, { onConflict: 'key' });
+            }
+
             setIsEditing(false);
             fetchEvents();
         } catch (err: any) {
@@ -405,6 +431,51 @@ export const EventsTab: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* SEO Settings */}
+                    <div className="bg-gray-50 p-6 border border-gray-100 space-y-6 mt-8">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xl serif italic text-[#1a1a1a]">SEO & Social Sharing</h4>
+                            <span className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Stored separately from event content</span>
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold">Meta Title (Browser & Google)</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingItem({ ...editingItem, meta_title: editingItem.title || '' })}
+                                    className="text-[9px] font-bold uppercase tracking-widest text-[#CDA235] hover:text-[#1a1a1a] transition-colors"
+                                >
+                                    ↺ Use Event Title
+                                </button>
+                            </div>
+                            <input
+                                type="text"
+                                value={editingItem.meta_title || editingItem.title || ''}
+                                onChange={e => setEditingItem({ ...editingItem, meta_title: e.target.value })}
+                                className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]"
+                                placeholder="e.g. Valentine's Day Dinner | Bag Søjlen"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Auto-filled from event title. Appears in browser tab and Google search results.</p>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Meta Description</label>
+                            <textarea value={editingItem.meta_description || ''} onChange={e => setEditingItem({ ...editingItem, meta_description: e.target.value })} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235] min-h-[80px]" placeholder="A brief description of this event for search engines (max 160 chars)" maxLength={160} />
+                            <p className="text-[10px] text-gray-400 mt-1 text-right">{(editingItem.meta_description || '').length}/160</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Custom URL Slug (Permalink)</label>
+                                <input type="text" value={editingItem.slug || ''} onChange={e => setEditingItem({ ...editingItem, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="e.g. valentines-day-2026" />
+                                <p className="text-[10px] text-gray-400 mt-1">Leave empty to use the event ID as URL</p>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Social Sharing Image URL</label>
+                                <input type="text" value={editingItem.og_image_url || ''} onChange={e => setEditingItem({ ...editingItem, og_image_url: e.target.value })} className="w-full text-base border-b border-gray-300 py-3 bg-transparent focus:outline-none focus:border-[#CDA235]" placeholder="https://... (Falls back to banner image)" />
+                                <p className="text-[10px] text-gray-400 mt-1">Image shown when shared on Facebook, Twitter, etc.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
                         <input type="checkbox" id="is_published" checked={editingItem.is_published} onChange={e => setEditingItem({ ...editingItem, is_published: e.target.checked })} className="w-4 h-4 accent-[#CDA235]" />
                         <label htmlFor="is_published" className="text-sm font-bold text-gray-700">Published (Visible to public)</label>
@@ -442,6 +513,10 @@ export const EventsTab: React.FC = () => {
                             end_date: '',
                             image_url: '',
                             is_published: true,
+                            meta_title: '',
+                            meta_description: '',
+                            slug: '',
+                            og_image_url: '',
                             details: {
                                 top_tag: 'BEGIVENHED',
                                 hero_date: '',
@@ -508,9 +583,27 @@ export const EventsTab: React.FC = () => {
                                             🌟 Set Featured
                                         </button>
                                     )}
-                                    <button onClick={() => {
+                                    <button onClick={async () => {
+                                        // Load SEO settings for this event from the settings table
+                                        let seoMeta = { meta_title: event.title || '', meta_description: '', slug: '', og_image_url: '' };
+                                        try {
+                                            const { data: seoData } = await supabase
+                                                .from('settings')
+                                                .select('key, value')
+                                                .like('key', `event_seo_${event.id}_%`);
+                                            if (seoData) {
+                                                seoData.forEach((row: any) => {
+                                                    const field = row.key.replace(`event_seo_${event.id}_`, '');
+                                                    (seoMeta as any)[field] = row.value;
+                                                });
+                                                // Always default meta_title to event title if empty
+                                                if (!seoMeta.meta_title) seoMeta.meta_title = event.title || '';
+                                            }
+                                        } catch { /* ignore */ }
+
                                         setEditingItem({
                                             ...event,
+                                            ...seoMeta,
                                             details: event.details || {
                                                 top_tag: 'BEGIVENHED',
                                                 hero_date: '',

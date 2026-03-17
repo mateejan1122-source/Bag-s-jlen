@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Language, translations } from '../translations';
 
@@ -10,6 +10,7 @@ interface EventDetailProps {
 
 export const EventDetail: React.FC<EventDetailProps> = ({ onBookingStart, language }) => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const t = translations[language].eventDetail;
   const tNews = translations[language].news;
 
@@ -18,33 +19,135 @@ export const EventDetail: React.FC<EventDetailProps> = ({ onBookingStart, langua
 
   useEffect(() => {
     const fetchEventData = async () => {
+      setLoading(true);
+
       if (id) {
-        const { data } = await supabase.from('events').select('*').eq('id', id).single();
-        setEventData(data);
-      } else {
-        // Fallback to featured event, then to latest event
-        const { data: settingsData } = await supabase.from('settings').select('*').eq('key', 'featured_event_id').maybeSingle();
-        if (settingsData && settingsData.value) {
-          const { data } = await supabase.from('events').select('*').eq('id', settingsData.value).single();
-          if (data) {
-            setEventData(data);
-            setLoading(false);
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        if (isUUID) {
+          // Direct ID lookup — check if a slug exists and redirect if it does
+          const { data: slugData } = await supabase
+            .from('settings')
+            .select('value')
+            .eq('key', `event_seo_${id}_slug`)
+            .maybeSingle();
+
+          if (slugData && slugData.value) {
+            navigate(`/event/${slugData.value}`, { replace: true });
             return;
           }
+
+          const { data } = await supabase.from('events').select('*').eq('id', id).single();
+          setEventData(data);
+        } else {
+          // Slug lookup — find matching event_seo_<id>_slug in settings
+          const { data: slugRows } = await supabase
+            .from('settings')
+            .select('key, value')
+            .eq('value', id)
+            .like('key', 'event_seo_%_slug');
+
+          if (slugRows && slugRows.length > 0) {
+            const key = slugRows[0].key;
+            const match = key.match(/^event_seo_(.+)_slug$/);
+            if (match) {
+              const eventId = match[1];
+              const { data } = await supabase.from('events').select('*').eq('id', eventId).single();
+              setEventData(data);
+            } else {
+              setEventData(null);
+            }
+          } else {
+            setEventData(null);
+          }
         }
-        
-        const { data } = await supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(1);
-        if (data && data.length > 0) {
-          setEventData(data[0]);
+        setLoading(false);
+        return;
+      }
+
+      // No :id param — fallback to featured event
+      const { data: settingsData } = await supabase.from('settings').select('*').eq('key', 'featured_event_id').maybeSingle();
+      if (settingsData && settingsData.value) {
+        const { data } = await supabase.from('events').select('*').eq('id', settingsData.value).single();
+        if (data) {
+          setEventData(data);
+          setLoading(false);
+          return;
         }
       }
+      const { data } = await supabase.from('events').select('*').eq('is_published', true).order('start_date', { ascending: true, nullsFirst: false }).limit(1);
+      if (data && data.length > 0) setEventData(data[0]);
       setLoading(false);
     };
 
     fetchEventData();
-  }, [id]);
+  }, [id, navigate]);
+
+  // SEO meta tag injection — reads from settings table (where meta_title/slug/etc are stored)
+  useEffect(() => {
+    if (!eventData) return;
+
+    const applyMeta = async () => {
+      let metaTitle = eventData.title || 'Event';
+      let metaDesc = eventData.description || '';
+      let ogImg = eventData.image_url || '';
+
+      // Load SEO settings from settings table
+      try {
+        const { data: seoData } = await supabase
+          .from('settings')
+          .select('key, value')
+          .like('key', `event_seo_${eventData.id}_%`);
+        if (seoData) {
+          seoData.forEach((row: any) => {
+            const field = row.key.replace(`event_seo_${eventData.id}_`, '');
+            if (field === 'meta_title' && row.value) metaTitle = row.value;
+            if (field === 'meta_description' && row.value) metaDesc = row.value;
+            if (field === 'og_image_url' && row.value) ogImg = row.value;
+          });
+        }
+      } catch { /* ignore */ }
+
+      document.title = `${metaTitle} | Bag Søjlen`;
+
+      // Meta description
+      let descTag = document.querySelector('meta[name="description"]');
+      if (!descTag) { descTag = document.createElement('meta'); descTag.setAttribute('name', 'description'); document.head.appendChild(descTag); }
+      descTag.setAttribute('content', metaDesc.slice(0, 160));
+
+      // OG Image
+      if (ogImg) {
+        let ogTag = document.querySelector('meta[property="og:image"]');
+        if (!ogTag) { ogTag = document.createElement('meta'); ogTag.setAttribute('property', 'og:image'); document.head.appendChild(ogTag); }
+        ogTag.setAttribute('content', ogImg);
+      }
+
+      // OG Title
+      let ogTitleTag = document.querySelector('meta[property="og:title"]');
+      if (!ogTitleTag) { ogTitleTag = document.createElement('meta'); ogTitleTag.setAttribute('property', 'og:title'); document.head.appendChild(ogTitleTag); }
+      ogTitleTag.setAttribute('content', `${metaTitle} | Bag Søjlen`);
+    };
+
+    applyMeta();
+    return () => { document.title = 'Bag Søjlen'; };
+  }, [eventData]);
 
   if (loading) return <div className="min-h-screen bg-[#faf9f6] flex items-center justify-center">Loading...</div>;
+
+  if (!eventData) {
+    return (
+      <div className="min-h-screen bg-[#faf9f6] flex flex-col items-center justify-center px-6 text-center">
+        <h1 className="text-4xl serif italic text-[#1a1a1a] mb-6">Arrangementet blev ikke fundet</h1>
+        <p className="text-gray-500 mb-10 max-w-md">Det ser ud til, at arrangementet er blevet fjernet eller URL'en er forkert.</p>
+        <button 
+          onClick={() => navigate('/')}
+          className="bg-[#1a1a1a] text-white px-10 py-4 text-[11px] font-bold uppercase tracking-[0.3em] hover:bg-[#CDA235] transition-all"
+        >
+          TILBAGE TIL FORSIDEN
+        </button>
+      </div>
+    );
+  }
 
   const getTranslatedText = (baseObj: any, key: string, language: Language, fallbackTag: string) => {
     if (!baseObj) return fallbackTag;

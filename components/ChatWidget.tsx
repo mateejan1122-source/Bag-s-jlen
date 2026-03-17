@@ -206,25 +206,42 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
     if (!sessionInfo || !bookingForm.date || !bookingForm.time) return;
     setIsBookingSubmitting(true);
     try {
-      const { error } = await supabase.from('bookings').insert([{
-        date: bookingForm.date,
-        time: bookingForm.time,
-        guests: bookingForm.guests,
-        fullName: sessionInfo.name,
-        email: sessionInfo.email,
-        phone: '',
-        specialRequests: 'Booked via Chat Widget',
-        status: 'confirmed'
-      }]);
-      if (error) throw error;
+      // Route through create-booking edge function for limit enforcement
+      const { data: result, error: fnError } = await supabase.functions.invoke('create-booking', {
+        body: {
+          date: bookingForm.date,
+          time: bookingForm.time,
+          guests: bookingForm.guests,
+          fullName: sessionInfo.name,
+          email: sessionInfo.email,
+          phone: '',
+          specialRequests: 'Booked via Chat Widget',
+          language: language
+        }
+      });
 
-      // Add a confirmation message to the chat
+      if (fnError) throw fnError;
+
+      if (!result?.success) {
+        // Booking rejected (slot full) — rejection email sent server-side
+        await supabase.from('chat_messages').insert({
+          session_id: sessionInfo.id,
+          sender: 'ai',
+          content: language === 'da'
+            ? `❌ Beklager, tidspunktet ${bookingForm.time} den ${bookingForm.date} er desværre fuldt booket. Prøv venligst et andet tidspunkt.`
+            : `❌ Sorry, the time slot ${bookingForm.time} on ${bookingForm.date} is fully booked. Please try a different time.`
+        });
+        setShowBookingForm(false);
+        return;
+      }
+
+      // Success — confirmation email sent server-side
       await supabase.from('chat_messages').insert({
         session_id: sessionInfo.id,
         sender: 'ai',
         content: language === 'da'
-          ? `✅ Din reservation er indsendt! ${bookingForm.date} kl. ${bookingForm.time} for ${bookingForm.guests} gæster. Vi bekræfter snarest.`
-          : `✅ Your reservation has been submitted! ${bookingForm.date} at ${bookingForm.time} for ${bookingForm.guests} guests. We will confirm shortly.`
+          ? `✅ Din reservation er bekræftet! ${bookingForm.date} kl. ${bookingForm.time} for ${bookingForm.guests} gæster.`
+          : `✅ Your reservation is confirmed! ${bookingForm.date} at ${bookingForm.time} for ${bookingForm.guests} guests.`
       });
 
       setShowBookingForm(false);
@@ -327,6 +344,28 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
     return <span>{content}</span>;
   };
 
+  // Renders plain text, converting basic markdown symbols to clean readable output
+  const renderPlainText = (text: string) => {
+    // Remove markdown headers (## Header → just "Header")
+    let clean = text.replace(/^#{1,6}\s+/gm, '');
+    // Remove bold/italic markers (** or *)
+    clean = clean.replace(/\*\*([^*]+)\*\*/g, '$1');
+    clean = clean.replace(/\*([^*]+)\*/g, '$1');
+    // Remove bullet list dashes at start of line
+    clean = clean.replace(/^[-•]\s+/gm, '');
+    // Remove numbered list formatting (1. 2. etc)
+    clean = clean.replace(/^\d+\.\s+/gm, '');
+    // Convert line breaks into React elements
+    const lines = clean.split('\n').filter(l => l.trim() !== '');
+    return (
+      <span>
+        {lines.map((line, i) => (
+          <span key={i}>{line}{i < lines.length - 1 && <br />}</span>
+        ))}
+      </span>
+    );
+  };
+
   const t_placeholder = language === 'da' ? 'Skriv en besked...' : language === 'de' ? 'Nachricht eingeben...' : 'Type a message...';
 
   return (
@@ -403,7 +442,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ language }) => {
                           </div>
                         )}
                         <div className={`p-3 text-sm ${isUser ? 'bg-[#CDA235] text-white' : 'bg-white border border-gray-200 text-gray-800'}`}>
-                          {renderMessageContent(msg.content)}
+                          {msg.sender === 'ai' ? renderPlainText(msg.content) : renderMessageContent(msg.content)}
                         </div>
                       </div>
                       <span className="text-[9px] text-gray-400 mt-1 uppercase tracking-wider mx-8">

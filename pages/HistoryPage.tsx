@@ -45,6 +45,32 @@ export const HistoryPage: React.FC<{ language: Language }> = ({ language }) => {
 
     const title = getTransSetting('history_title') || tHist.title;
     const bannerUrl = settings['history_image_url'] || 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg';
+
+    // SEO meta tag injection
+    useEffect(() => {
+        if (loading) return;
+        document.title = `${title} | Bag Søjlen`;
+
+        const metaDesc = settings['history_meta_description'] || '';
+        if (metaDesc) {
+            let descTag = document.querySelector('meta[name="description"]');
+            if (!descTag) { descTag = document.createElement('meta'); descTag.setAttribute('name', 'description'); document.head.appendChild(descTag); }
+            descTag.setAttribute('content', metaDesc.slice(0, 160));
+        }
+
+        const ogImg = settings['history_og_image'] || bannerUrl;
+        if (ogImg) {
+            let ogTag = document.querySelector('meta[property="og:image"]');
+            if (!ogTag) { ogTag = document.createElement('meta'); ogTag.setAttribute('property', 'og:image'); document.head.appendChild(ogTag); }
+            ogTag.setAttribute('content', ogImg);
+        }
+
+        let ogTitleTag = document.querySelector('meta[property="og:title"]');
+        if (!ogTitleTag) { ogTitleTag = document.createElement('meta'); ogTitleTag.setAttribute('property', 'og:title'); document.head.appendChild(ogTitleTag); }
+        ogTitleTag.setAttribute('content', `${title} | Bag Søjlen`);
+
+        return () => { document.title = 'Bag Søjlen'; };
+    }, [loading, settings]);
     
     // Default to the short text if the admin hasn't provided a full text yet
     const rawFullText = getTransSetting('history_full_text') || getTransSetting('history_text1') || tHist.text1;

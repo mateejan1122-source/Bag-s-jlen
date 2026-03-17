@@ -10,7 +10,7 @@ export const HistoryTab: React.FC = () => {
     const [uploadingImage, setUploadingImage] = useState(false);
 
     // Base keys without language suffix
-    const baseKeys = ['history_tag', 'history_title', 'history_text1', 'history_full_text', 'history_readMore', 'history_image_url', 'history_link_url'];
+    const baseKeys = ['history_tag', 'history_title', 'history_text1', 'history_full_text', 'history_readMore', 'history_image_url', 'history_link_url', 'history_meta_description', 'history_slug', 'history_og_image'];
 
     const fetchSettings = async () => {
         setLoading(true);
@@ -305,6 +305,45 @@ export const HistoryTab: React.FC = () => {
                                 />
                                 <p className="text-[10px] tracking-wide text-gray-400 mt-2">The page this button navigates to (eg. "/vores-historie").</p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="pt-8 border-t border-gray-100 space-y-6 relative z-10">
+                    <h4 className="text-lg serif italic text-[#1a1a1a] flex items-center gap-2">SEO & Social Sharing</h4>
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Meta Description</label>
+                        <textarea
+                            value={settings['history_meta_description'] || ''}
+                            onChange={(e) => setSettings({ ...settings, history_meta_description: e.target.value })}
+                            className="w-full text-base font-light text-gray-600 leading-relaxed border border-gray-200 p-5 focus:outline-none focus:border-[#CDA235] transition-colors min-h-[80px] bg-gray-50/50"
+                            placeholder="A brief description of the History page for search engines (max 160 chars)"
+                            maxLength={160}
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1 text-right">{(settings['history_meta_description'] || '').length}/160</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Custom URL Slug (Permalink)</label>
+                            <input
+                                type="text"
+                                value={settings['history_slug'] || ''}
+                                onChange={(e) => setSettings({ ...settings, history_slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+                                className="w-full text-sm border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors bg-transparent"
+                                placeholder="e.g. vores-historie"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Custom permalink for the history page</p>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Social Sharing Image URL</label>
+                            <input
+                                type="text"
+                                value={settings['history_og_image'] || ''}
+                                onChange={(e) => setSettings({ ...settings, history_og_image: e.target.value })}
+                                className="w-full text-sm border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors bg-transparent"
+                                placeholder="https://... (Falls back to section image)"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Image shown when shared on social media</p>
                         </div>
                     </div>
                 </div>
