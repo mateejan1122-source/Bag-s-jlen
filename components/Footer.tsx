@@ -22,17 +22,17 @@ const DEFAULT_CLOSED: Record<Language, string> = {
 const DynamicHours: React.FC<{ language: Language; settings: Record<string, string> }> = ({ language, settings }) => {
   const labels = DAY_LABELS[language] || DAY_LABELS.da;
 
-  // Helper: return setting value only if it's a non-empty, non-whitespace string
-  const val = (key: string) => (settings[key] ?? '').trim() || '';
+  // Helper: return setting value for the current language or fallback to DA
+  const getVal = (key: string) => {
+    if (language === 'da') return (settings[key] ?? '').trim();
+    return (settings[`${key}_${language}`] ?? '').trim() || (settings[key] ?? '').trim();
+  };
 
-  const tueSatHours = val('hours_tuesday_saturday') || '17.00 – 22.00';
-  const lunchSatHours = val('hours_lunch_saturday') || '12.00 – 15.00';
-  const sunMonHours = val('hours_sunday_monday') || DEFAULT_CLOSED[language] || DEFAULT_CLOSED.da;
+  const tueSatHours = getVal('hours_tuesday_saturday') || '17.00 – 22.00';
+  const lunchSatHours = getVal('hours_lunch_saturday') || '12.00 – 15.00';
+  const sunMonHours = getVal('hours_sunday_monday') || DEFAULT_CLOSED[language] || DEFAULT_CLOSED.da;
 
-  // Treat the Sunday & Monday row as "closed" when the admin hasn't changed it
-  // or when the value matches a known closed phrase.
-  const closedPhrases = Object.values(DEFAULT_CLOSED);
-  const isClosed = closedPhrases.some(p => sunMonHours.toLowerCase() === p.toLowerCase())
+  const isClosed = Object.values(DEFAULT_CLOSED).some(p => sunMonHours.toLowerCase() === p.toLowerCase())
     || sunMonHours.toLowerCase().startsWith('lukket')
     || sunMonHours.toLowerCase().startsWith('closed')
     || sunMonHours.toLowerCase().startsWith('geschlossen');
@@ -214,9 +214,9 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
       <div className="flex flex-col md:flex-row justify-between items-center text-[10px] text-gray-600 uppercase tracking-widest pt-12 border-t border-white/5 gap-8 text-center md:text-left">
         {/* Copyright */}
         <p>
-          {settings.general_copyright
-            ? settings.general_copyright
-            : `© ${new Date().getFullYear()} BAG SØJLEN. ${language === 'da' ? 'DANSK & FRANSK KØKKEN' : language === 'en' ? 'DANISH & FRENCH KITCHEN' : 'DÄNISCHE & FRANZÖSISCHE KÜCHE'}.`}
+          {language === 'da'
+            ? (settings.general_copyright || `© ${new Date().getFullYear()} BAG SØJLEN. DANSK & FRANSK KØKKEN.`)
+            : (settings[`general_copyright_${language}`] || settings.general_copyright || `© ${new Date().getFullYear()} BAG SØJLEN. ${language === 'en' ? 'DANISH & FRENCH KITCHEN' : 'DÄNISCHE & FRANZÖSISCHE KÜCHE'}.`)}
         </p>
 
         {/* Right side: Manage + Policy Links */}

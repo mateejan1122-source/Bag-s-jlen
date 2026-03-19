@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Globe } from 'lucide-react';
+import { LanguageTabs, LanguageCode } from '../../components/admin/LanguageTabs';
+import { autoTranslateFields } from '../../lib/translation';
 
 export const ContentTab: React.FC = () => {
     const [settings, setSettings] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(false);
-    const [activeLang, setActiveLang] = useState<'da' | 'en' | 'de'>('da');
+    const [activeLang, setActiveLang] = useState<LanguageCode>('da');
     const [isTranslating, setIsTranslating] = useState(false);
+    const [forceOverwrite, setForceOverwrite] = useState(false);
 
     // Base keys without language suffix
     const baseKeys = ['hero_welcome', 'hero_title', 'hero_subtitle', 'hero_btn_book', 'hero_btn_menu', 'footer_desc', 'events_tag', 'events_title', 'events_sub', 'events_phone', 'events_contact', 'events_localText', 'events_finalText'];
@@ -70,58 +73,34 @@ export const ContentTab: React.FC = () => {
     const handleAutoTranslate = async () => {
         setIsTranslating(true);
         try {
-            const sourceLang = activeLang;
-            
+            const apiKey = settings['deepl_api_key'] || '';
             const keysToTranslate = [
                 'hero_welcome', 'hero_title', 'hero_subtitle', 'hero_btn_book', 'hero_btn_menu', 
                 'footer_desc', 
                 'events_tag', 'events_title', 'events_sub', 'events_contact', 'events_localText', 'events_finalText'
             ];
-            const targetLangs = ['da', 'en', 'de'].filter(l => l !== sourceLang);
             
-            const newSettings = { ...settings };
-            let hasText = false;
+            const fields = keysToTranslate.map(key => {
+                const sourceKey = activeLang === 'da' ? key : `${key}_${activeLang}`;
+                return {
+                    sourceKey,
+                    sourceText: settings[sourceKey] || '',
+                    targets: ['da', 'en', 'de']
+                        .filter(l => l !== activeLang)
+                        .map(l => ({
+                            lang: l as LanguageCode,
+                            key: l === 'da' ? key : `${key}_${l}`,
+                            currentText: settings[l === 'da' ? key : `${key}_${l}`] || ''
+                        }))
+                };
+            });
 
-            for (const key of keysToTranslate) {
-                const sourceKey = sourceLang === 'da' ? key : `${key}_${sourceLang}`;
-                const textToTranslate = settings[sourceKey];
-                
-                if (textToTranslate && textToTranslate.trim() !== '') {
-                    hasText = true;
-                    for (const targetLang of targetLangs) {
-                        const targetKey = targetLang === 'da' ? key : `${key}_${targetLang}`;
-                        const deepLTarget = targetLang === 'en' ? 'EN-GB' : targetLang.toUpperCase();
-                        const { data, error } = await supabase.functions.invoke('translate', {
-                            body: {
-                                text: [textToTranslate],
-                                target_lang: deepLTarget
-                            }
-                        });
-                        
-                        if (error) {
-                            console.error('DeepL Translation API Error:', error);
-                            continue;
-                        }
-                        
-                        if (data?.translations?.[0]?.text) {
-                            newSettings[targetKey] = data.translations[0].text;
-                        }
-                    }
-                }
-            }
-            
-            if (!hasText) {
-                alert('Please enter some text in the current language tab before translating.');
-                setIsTranslating(false);
-                return;
-            }
-            
-            setSettings(newSettings);
+            const updates = await autoTranslateFields(apiKey, activeLang, fields, forceOverwrite);
+            setSettings(prev => ({ ...prev, ...updates }));
             alert('Translation complete! Please review the other tabs to verify.');
-            
-        } catch (error) {
+        } catch (error: any) {
             console.error('Translation error:', error);
-            alert('Failed to auto-translate. The free translation service might be temporarily unavailable.');
+            alert(error.message || 'Failed to auto-translate.');
         } finally {
             setIsTranslating(false);
         }
@@ -133,49 +112,25 @@ export const ContentTab: React.FC = () => {
                 <span className="text-[#CDA235] text-[11px] font-bold tracking-[0.5em] uppercase block mb-2">COPYWRITING</span>
                 <div className="flex justify-between items-center">
                     <h1 className="text-4xl md:text-5xl serif italic text-[#1a1a1a]">Website Content</h1>
-                    <div className="flex bg-gray-100 p-1 rounded-md">
-                        <button
-                            type="button"
-                            onClick={() => setActiveLang('da')}
-                            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors rounded-sm ${activeLang === 'da' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}
-                        >
-                            Dansk
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveLang('en')}
-                            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors rounded-sm ${activeLang === 'en' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}
-                        >
-                            English
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveLang('de')}
-                            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors rounded-sm ${activeLang === 'de' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}
-                        >
-                            Deutsch
-                        </button>
-                    </div>
                 </div>
                 <p className="text-gray-500 mt-4 text-sm font-light">Manage translations for the Hero section and Footer.</p>
             </div>
 
+            <LanguageTabs 
+                activeLang={activeLang}
+                onLangChange={setActiveLang}
+                onAutoTranslate={handleAutoTranslate}
+                isTranslating={isTranslating}
+                showAutoTranslate={true}
+                forceOverwrite={forceOverwrite}
+                onOverwriteChange={setForceOverwrite}
+            />
+
             <form onSubmit={handleSave} className="bg-white p-8 border border-gray-100 shadow-[0_20px_40px_rgba(0,0,0,0.03)] space-y-8">
-                
-                <div className="flex justify-between items-center bg-gray-50 p-4 border border-gray-100 mb-8 rounded-sm">
-                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Auto-Translation Settings</div>
-                    <button 
-                        type="button" 
-                        onClick={handleAutoTranslate}
-                        disabled={isTranslating}
-                        className="text-[10px] bg-white border border-gray-200 px-4 py-2 font-bold uppercase tracking-widest text-[#CDA235] hover:border-[#CDA235] transition-colors flex items-center gap-2 disabled:opacity-50"
-                    >
-                        {isTranslating ? 'Translating...' : '✨ Auto-Translate All Fields'}
-                    </button>
-                </div>
                 <div>
                     <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Hero Welcome Text (Small Tag)</label>
                     <input
+                        key={`hero_welcome-${activeLang}`}
                         type="text"
                         value={settings[getFormKey('hero_welcome')] || ''}
                         onChange={(e) => updateSetting('hero_welcome', e.target.value)}
@@ -186,6 +141,7 @@ export const ContentTab: React.FC = () => {
                 <div>
                     <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Main Hero Title</label>
                     <input
+                        key={`hero_title-${activeLang}`}
                         type="text"
                         value={settings[getFormKey('hero_title')] || ''}
                         onChange={(e) => updateSetting('hero_title', e.target.value)}
@@ -196,6 +152,7 @@ export const ContentTab: React.FC = () => {
                 <div>
                     <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Hero Subtitle</label>
                     <textarea
+                        key={`hero_subtitle-${activeLang}`}
                         value={settings[getFormKey('hero_subtitle')] || ''}
                         onChange={(e) => updateSetting('hero_subtitle', e.target.value)}
                         className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors min-h-[100px]"
@@ -206,6 +163,7 @@ export const ContentTab: React.FC = () => {
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Primary Button (Left)</label>
                         <input
+                            key={`hero_btn_book-${activeLang}`}
                             type="text"
                             value={settings[getFormKey('hero_btn_book')] || ''}
                             onChange={(e) => updateSetting('hero_btn_book', e.target.value)}
@@ -216,6 +174,7 @@ export const ContentTab: React.FC = () => {
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Secondary Button (Right)</label>
                         <input
+                            key={`hero_btn_menu-${activeLang}`}
                             type="text"
                             value={settings[getFormKey('hero_btn_menu')] || ''}
                             onChange={(e) => updateSetting('hero_btn_menu', e.target.value)}
@@ -232,6 +191,7 @@ export const ContentTab: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Section Tag</label>
                                 <input
+                                    key={`events_tag-${activeLang}`}
                                     type="text"
                                     value={settings[getFormKey('events_tag')] || ''}
                                     onChange={(e) => updateSetting('events_tag', e.target.value)}
@@ -242,6 +202,7 @@ export const ContentTab: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Section Title</label>
                                 <input
+                                    key={`events_title-${activeLang}`}
                                     type="text"
                                     value={settings[getFormKey('events_title')] || ''}
                                     onChange={(e) => updateSetting('events_title', e.target.value)}
@@ -253,6 +214,7 @@ export const ContentTab: React.FC = () => {
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Main Description</label>
                             <textarea
+                                key={`events_sub-${activeLang}`}
                                 value={settings[getFormKey('events_sub')] || ''}
                                 onChange={(e) => updateSetting('events_sub', e.target.value)}
                                 className="w-full text-sm font-light leading-relaxed border border-gray-200 p-4 focus:outline-none focus:border-[#CDA235] min-h-[100px]"
@@ -273,6 +235,7 @@ export const ContentTab: React.FC = () => {
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Contact Box Title</label>
                             <input
+                                key={`events_contact-${activeLang}`}
                                 type="text"
                                 value={settings[getFormKey('events_contact')] || ''}
                                 onChange={(e) => updateSetting('events_contact', e.target.value)}
@@ -284,6 +247,7 @@ export const ContentTab: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Contact Box Local Text</label>
                                 <textarea
+                                    key={`events_localText-${activeLang}`}
                                     value={settings[getFormKey('events_localText')] || ''}
                                     onChange={(e) => updateSetting('events_localText', e.target.value)}
                                     className="w-full text-sm font-light leading-relaxed border border-gray-200 p-4 focus:outline-none focus:border-[#CDA235] min-h-[100px]"
@@ -293,6 +257,7 @@ export const ContentTab: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Contact Box Final Text</label>
                                 <textarea
+                                    key={`events_finalText-${activeLang}`}
                                     value={settings[getFormKey('events_finalText')] || ''}
                                     onChange={(e) => updateSetting('events_finalText', e.target.value)}
                                     className="w-full text-sm font-light leading-relaxed border border-gray-200 p-4 focus:outline-none focus:border-[#CDA235] min-h-[100px]"
@@ -306,6 +271,7 @@ export const ContentTab: React.FC = () => {
                 <div className="pt-8 border-t border-gray-100">
                     <label className="block text-[10px] uppercase tracking-widest text-[#CDA235] font-bold mb-2">Footer Short Description</label>
                     <textarea
+                        key={`footer_desc-${activeLang}`}
                         value={settings[getFormKey('footer_desc')] || ''}
                         onChange={(e) => updateSetting('footer_desc', e.target.value)}
                         className="w-full text-sm font-light leading-relaxed border border-gray-200 p-4 focus:outline-none focus:border-[#CDA235] transition-colors min-h-[120px]"

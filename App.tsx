@@ -149,7 +149,6 @@ const App: React.FC = () => {
             <Route path="/our-history" element={<HistoryPage language={language} />} />
             <Route path="/vores-historie" element={<HistoryPage language={language} />} />
             <Route path="/unsere-geschichte" element={<HistoryPage language={language} />} />
-
             <Route path="/:slug" element={<DynamicPage language={language} />} />
           </Routes>
         </main>

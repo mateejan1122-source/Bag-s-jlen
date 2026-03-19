@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BookingData } from '../types';
 import { Language, translations } from '../translations';
 import { supabase } from '../lib/supabase';
+import { getHeroSectionContentProps, getSectionVisualProps, toPx, useHomepageVisualConfig } from '../src/puck/homepageVisualConfig';
 
 interface HomePartProps {
   onBookingStart?: () => void;
@@ -32,6 +33,11 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
   const tHero = translations[language].hero;
   const tPhil = translations[language].philosophy;
   const tHist = translations[language].history;
+  const homepageVisualConfig = useHomepageVisualConfig();
+  const heroVisual = getSectionVisualProps(homepageVisualConfig, 'HeroSection');
+  const heroContent = getHeroSectionContentProps(homepageVisualConfig);
+  const philosophyVisual = getSectionVisualProps(homepageVisualConfig, 'PhilosophySection');
+  const historyVisual = getSectionVisualProps(homepageVisualConfig, 'HistorySection');
 
   React.useEffect(() => {
     supabase.from('settings').select('*')
@@ -45,10 +51,8 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
       const { data: eventData } = await supabase.from('events').select('*').eq('id', id).single();
       if (eventData) {
         setFeaturedEvent(eventData);
-        // Fetch slug from settings
         const { data: slugData } = await supabase.from('settings').select('value').eq('key', `event_seo_${id}_slug`).maybeSingle();
         if (slugData?.value) {
-          // Store slug in a temp property or handling it in navigation
           eventData.slug = slugData.value;
         }
       } else {
@@ -76,29 +80,62 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
       });
   }, []);
 
-  // Force video play when hero_video_url is loaded (Chrome blocks autoPlay on dynamic sources)
   React.useEffect(() => {
     if (settings.hero_video_url && videoRef.current) {
       videoRef.current.load();
       videoRef.current.play().catch(() => {
-        // Autoplay blocked by browser policy - user must interact first
         setIsPlaying(false);
       });
     }
   }, [settings.hero_video_url]);
 
-
-
-  // Helper to fallback to default (Danish) if translation is empty
   const getTransSetting = (baseKey: string) => {
     const langKey = language === 'da' ? baseKey : `${baseKey}_${language}`;
     return settings[langKey] || settings[baseKey];
   };
 
+  const heroEyebrow = heroContent.eyebrow || getTransSetting('hero_welcome') || tHero.welcome;
+  const heroTitle = heroContent.title || getTransSetting('hero_title') || 'Bag Sojlen';
+  const heroSubtitle = heroContent.subtitle || getTransSetting('hero_subtitle') || tHero.sub;
+  const heroButtons = heroContent.buttons && heroContent.buttons.length > 0
+    ? heroContent.buttons
+    : [
+        { label: getTransSetting('hero_btn_book') || tHero.book, action: 'book', variant: 'primary' },
+        { label: getTransSetting('hero_btn_menu') || tHero.seeMenu, action: 'menu', variant: 'secondary' },
+      ];
+
+  const handleHeroButtonClick = (button: { action?: string; href?: string }) => {
+    if (button.action === 'book') {
+      onBookingStart?.();
+      return;
+    }
+
+    if (button.action === 'menu') {
+      document.getElementById('menu-section')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    if (!button.href) {
+      return;
+    }
+
+    if (button.href.startsWith('#')) {
+      document.getElementById(button.href.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    if (button.href.startsWith('/')) {
+      navigate(button.href);
+      return;
+    }
+
+    window.location.href = button.href;
+  };
+
   return (
     <div className="flex flex-col bg-[#faf9f6] w-full">
       {/* Hero Section */}
-      <section className="relative min-h-[600px] h-[85vh] flex flex-col items-center justify-center text-center px-4 overflow-hidden bg-[#0a0a0a] w-full">
+      <section className="relative min-h-[600px] h-[85vh] flex flex-col items-center justify-center text-center px-4 overflow-hidden bg-[#0a0a0a] w-full" style={{ backgroundColor: heroVisual.backgroundColor, paddingTop: toPx(heroVisual.paddingTop), paddingBottom: toPx(heroVisual.paddingBottom), minHeight: toPx(heroVisual.minHeight) }}>
         <div className="absolute inset-0 z-0">
           {settings.hero_video_url ? (
             <video
@@ -114,48 +151,48 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
           ) : (
             <div
               className="w-full h-full bg-cover bg-center transition-transform duration-[8000ms] scale-105"
-              style={{ backgroundImage: `url(${settings.hero_bg_image || 'https://i.pixi.mg/i/bc4967f7161097374bbf013a.jpg'})` }}
+              style={{ backgroundImage: `url(${heroVisual.backgroundImage || settings.hero_bg_image || 'https://i.pixi.mg/i/bc4967f7161097374bbf013a.jpg'})` }}
             >
             </div>
           )}
-          <div className="absolute inset-0 bg-black/55 z-10 pointer-events-none"></div>
+          <div className="absolute inset-0 z-10 pointer-events-none" style={{ backgroundColor: heroVisual.overlayColor || 'rgba(0,0,0,0.55)' }}></div>
         </div>
 
         <div className="relative z-20 max-w-7xl px-4">
-          <div className="text-[12px] md:text-[14px] tracking-[0.6em] text-[#c5a059] uppercase font-bold mb-4 md:mb-6 drop-shadow-2xl">{getTransSetting('hero_welcome') || tHero.welcome}</div>
-          <h1 className="text-[54px] md:text-[100px] lg:text-[140px] font-normal serif mb-4 md:mb-6 tracking-tighter leading-none text-white drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]">{getTransSetting('hero_title') || 'Bag Søjlen'}</h1>
-          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed whitespace-pre-wrap font-light">{getTransSetting('hero_subtitle') || tHero.sub}</p>
+          <div className="text-[12px] md:text-[14px] tracking-[0.6em] text-[#c5a059] uppercase font-bold mb-4 md:mb-6 drop-shadow-2xl" style={{ color: heroVisual.accentColor }}>{heroEyebrow}</div>
+          <h1 className="text-[54px] md:text-[100px] lg:text-[140px] font-normal serif mb-4 md:mb-6 tracking-tighter leading-none text-white drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]" style={{ color: heroVisual.textColor }}>{heroTitle}</h1>
+          <p className="text-lg md:text-xl lg:text-2xl serif italic text-white/95 mb-8 md:mb-10 max-w-3xl mx-auto drop-shadow-xl leading-relaxed whitespace-pre-wrap font-light" style={{ color: heroVisual.textColor }}>{heroSubtitle}</p>
 
           <div className="mb-10 md:mb-14 text-[10px] md:text-[11px] tracking-[0.3em] md:tracking-[0.4em] font-bold uppercase text-white/70 flex flex-wrap justify-center items-center gap-x-8 md:gap-x-12 gap-y-3">
-            <span className="whitespace-nowrap">{language === 'da' ? 'Tir - Lør' : language === 'en' ? 'Tue - Sat' : 'Die - Sam'}: 17.00 - 22.00</span>
+            <span className="whitespace-nowrap">{language === 'da' ? 'Tir - Lor' : language === 'en' ? 'Tue - Sat' : 'Die - Sam'}: 17.00 - 22.00</span>
             <span className="hidden md:block w-1.5 h-1.5 bg-[#c5a059] rounded-full"></span>
-            <span className="whitespace-nowrap">{language === 'da' ? 'Frokost Lør' : language === 'en' ? 'Lunch Sat' : 'Mittag Sam'}: 12.00 - 15.00</span>
+            <span className="whitespace-nowrap">{language === 'da' ? 'Frokost Lor' : language === 'en' ? 'Lunch Sat' : 'Mittag Sam'}: 12.00 - 15.00</span>
             <span className="hidden md:block w-1.5 h-1.5 bg-[#c5a059] rounded-full"></span>
             <span className="whitespace-nowrap">{translations[language].footer.closedAftale}</span>
           </div>
 
           <div className="flex flex-col sm:flex-row justify-center gap-4 md:gap-6">
-            <button
-              onClick={onBookingStart}
-              className="bg-white text-black px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-[#c5a059] hover:text-white transition-all shadow-2xl w-full sm:w-auto"
-            >
-              {getTransSetting('hero_btn_book') || tHero.book}
-            </button>
-            <button
-              onClick={() => document.getElementById('menu-section')?.scrollIntoView({ behavior: 'smooth' })}
-              className="border-[2px] md:border-[3px] border-white/60 bg-white/5 backdrop-blur-md text-white px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-white hover:text-black transition-all w-full sm:w-auto"
-            >
-              {getTransSetting('hero_btn_menu') || tHero.seeMenu}
-            </button>
+            {heroButtons.map((button, index) => (
+              <button
+                key={`${button.label}-${index}`}
+                type="button"
+                onClick={() => handleHeroButtonClick(button)}
+                className={button.variant === 'secondary'
+                  ? 'border-[2px] md:border-[3px] border-white/60 bg-white/5 backdrop-blur-md text-white px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-white hover:text-black transition-all w-full sm:w-auto'
+                  : 'bg-white text-black px-8 md:px-10 py-4 md:py-5 text-[10px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] font-bold uppercase hover:bg-[#c5a059] hover:text-white transition-all shadow-2xl w-full sm:w-auto'}
+              >
+                {button.label}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="absolute bottom-6 right-6 md:bottom-12 md:right-12 z-30 flex items-center gap-4">
           <span className="hidden md:block text-[10px] tracking-[0.4em] text-white uppercase font-bold opacity-40">{tHero.sound} {isMuted ? (language === 'da' ? 'FRA' : 'OFF') : (language === 'da' ? 'TIL' : 'ON')}</span>
-          
+
           <button
             onClick={togglePlay}
-            title={isPlaying ? "Pause Video" : "Play Video"}
+            title={isPlaying ? 'Pause Video' : 'Play Video'}
             className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/20 backdrop-blur-xl flex items-center justify-center text-white hover:border-[#c5a059] hover:text-[#c5a059] transition-all bg-white/10 group shadow-2xl"
           >
             {isPlaying ? (
@@ -190,9 +227,8 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
           </button>
         </div>
       </section>
-
       {/* Philosophy Section */}
-      <section className="px-6 md:px-20 py-20 md:py-32 grid lg:grid-cols-2 gap-12 md:gap-20 items-center max-w-[1440px] mx-auto w-full relative">
+      <section className="px-6 md:px-20 py-20 md:py-32 grid lg:grid-cols-2 gap-12 md:gap-20 items-center max-w-[1440px] mx-auto w-full relative" style={{ backgroundColor: philosophyVisual.backgroundColor, paddingTop: toPx(philosophyVisual.paddingTop), paddingBottom: toPx(philosophyVisual.paddingBottom) }}>
         <div className="relative group w-full">
           <div className="absolute top-4 left-4 md:top-8 md:left-8 w-full h-full border border-[#CDA235]/30 transition-transform group-hover:translate-x-1 group-hover:translate-y-1 md:group-hover:translate-x-2 md:group-hover:translate-y-2 duration-1000"></div>
           <div className="h-[350px] md:h-[500px] lg:h-[700px] w-full relative overflow-hidden shadow-[20px_20px_40px_rgba(0,0,0,0.1)] md:shadow-[40px_40px_80px_rgba(0,0,0,0.1)] border-[6px] md:border-[10px] border-white z-10">
@@ -205,18 +241,18 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
         </div>
 
         <div className="p-4 md:p-10 flex flex-col justify-center text-left w-full">
-          <div className="w-10 md:w-12 h-0.5 bg-[#CDA235] mb-6 md:mb-10"></div>
-          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.5em] md:tracking-[0.6em] uppercase block mb-4 md:mb-6">{tPhil.tag}</span>
-          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-10 leading-none text-[#1a1a1a] tracking-tighter">{tPhil.title}</h2>
+          <div className="w-10 md:w-12 h-0.5 bg-[#CDA235] mb-6 md:mb-10" style={{ backgroundColor: philosophyVisual.accentColor }}></div>
+          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.5em] md:tracking-[0.6em] uppercase block mb-4 md:mb-6" style={{ color: philosophyVisual.accentColor }}>{tPhil.tag}</span>
+          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-10 leading-none text-[#1a1a1a] tracking-tighter" style={{ color: philosophyVisual.textColor }}>{tPhil.title}</h2>
           
           <div className="relative mb-8 md:mb-12">
             <span className="absolute -top-4 -left-4 md:-top-8 md:-left-8 text-[60px] md:text-[100px] serif text-[#CDA235]/10 leading-none pointer-events-none italic font-light">“</span>
-            <p className="italic serif text-gray-400 text-xl md:text-2xl lg:text-3xl leading-[1.6] relative z-10">
+            <p className="italic serif text-gray-400 text-xl md:text-2xl lg:text-3xl leading-[1.6] relative z-10" style={{ color: philosophyVisual.textColor }}>
               {tPhil.quote}
             </p>
           </div>
 
-          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-500 leading-relaxed font-light">
+          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-500 leading-relaxed font-light" style={{ color: philosophyVisual.textColor }}>
             <p>{tPhil.text1}</p>
             <p>{tPhil.text2}</p>
             <p className="italic text-[#1a1a1a] font-medium serif text-lg md:text-xl mt-4 md:mt-6">{tPhil.footer}</p>
@@ -230,15 +266,15 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
       </section>
 
       {/* History Section */}
-      <section id="history-section" className="px-6 md:px-20 py-0 grid lg:grid-cols-2 gap-0 items-stretch max-w-[1440px] mx-auto w-full pb-20 md:pb-32">
-        <div className="p-8 md:p-14 lg:p-20 xl:p-24 z-20 relative bg-white border border-[#f2f1ed] shadow-[20px_20px_40px_rgba(0,0,0,0.02)] flex flex-col justify-center text-left">
-          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-8">
+      <section id="history-section" className="px-6 md:px-20 py-0 grid lg:grid-cols-2 gap-0 items-stretch max-w-[1440px] mx-auto w-full pb-20 md:pb-32" style={{ backgroundColor: historyVisual.backgroundColor, paddingTop: toPx(historyVisual.paddingTop), paddingBottom: toPx(historyVisual.paddingBottom) }}>
+        <div className="p-8 md:p-14 lg:p-20 xl:p-24 z-20 relative bg-white border border-[#f2f1ed] shadow-[20px_20px_40px_rgba(0,0,0,0.02)] flex flex-col justify-center text-left" style={{ backgroundColor: historyVisual.surfaceColor, borderColor: historyVisual.borderColor, color: historyVisual.textColor }}>
+          <span className="text-[#CDA235] text-[10px] md:text-[11px] font-bold tracking-[0.4em] md:tracking-[0.5em] uppercase block mb-4 md:mb-8" style={{ color: historyVisual.accentColor }}>
             {getTransSetting('history_tag') || tHist.tag}
           </span>
-          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none">
+          <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none" style={{ color: historyVisual.textColor }}>
             {getTransSetting('history_title') || tHist.title}
           </h2>
-          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl">
+          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl" style={{ color: historyVisual.textColor }}>
             <p>{getTransSetting('history_text1') || tHist.text1}</p>
             <button
               type="button"
@@ -247,7 +283,7 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
                 const link = getTransSetting('history_link_url') || defaultSearchLink;
                 if (link) navigate(link);
               }}
-              className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start cursor-pointer"
+              className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start cursor-pointer" style={{ color: historyVisual.accentColor, borderColor: historyVisual.accentColor }}
             >
               {getTransSetting('history_readMore') || tHist.readMore}
             </button>
@@ -259,7 +295,7 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
             className="absolute inset-0 img-cover grayscale-[0.2] brightness-75 transition-all hover:grayscale-0 hover:brightness-100 duration-1000 group-hover:scale-105"
             style={{ backgroundImage: `url(${getTransSetting('history_image_url') || 'https://i.pixi.mg/i/62fcaff217b2df779c5f1878.jpg'})` }}
           ></div>
-          <div className="absolute inset-0 bg-gradient-to-l from-black/20 via-transparent to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 pointer-events-none" style={{ background: historyVisual.overlayColor || 'linear-gradient(to left, rgba(0,0,0,0.2), transparent)' }}></div>
         </div>
       </section>
 
@@ -292,6 +328,9 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
   const [menuCategories, setMenuCategories] = useState<{ id: string; name: string; display_order: number; is_visible: boolean }[]>([]);
   const tMenu = translations[language].menu;
   const tSeas = translations[language].seasonal;
+  const homepageVisualConfig = useHomepageVisualConfig();
+  const menuVisual = getSectionVisualProps(homepageVisualConfig, 'MenuSection');
+  const seasonalVisual = getSectionVisualProps(homepageVisualConfig, 'SeasonalSection');
 
   // Default categories (fallback if admin hasn't customized them)
   const defaultCategories = [
@@ -363,9 +402,9 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
       )}
 
       {/* Menukort Section */}
-      <section id="menu-section" className="px-6 md:px-20 pb-20 md:pb-32 pt-16 md:pt-24 text-center max-w-[1440px] mx-auto w-full">
-        <h2 className="text-[60px] md:text-[100px] serif mb-8 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none">{tMenu.title}</h2>
-        <p className="text-[12px] md:text-[13px] tracking-[0.5em] md:tracking-[0.8em] text-[#CDA235] uppercase mb-16 md:mb-24 font-bold">{tMenu.sub}</p>
+      <section id="menu-section" className="px-6 md:px-20 pb-20 md:pb-32 pt-16 md:pt-24 text-center max-w-[1440px] mx-auto w-full" style={{ backgroundColor: menuVisual.backgroundColor, paddingTop: toPx(menuVisual.paddingTop), paddingBottom: toPx(menuVisual.paddingBottom) }}>
+        <h2 className="text-[60px] md:text-[100px] serif mb-8 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none" style={{ color: menuVisual.textColor }}>{tMenu.title}</h2>
+        <p className="text-[12px] md:text-[13px] tracking-[0.5em] md:tracking-[0.8em] text-[#CDA235] uppercase mb-16 md:mb-24 font-bold" style={{ color: menuVisual.accentColor }}>{tMenu.sub}</p>
 
         {/* Navigation Tabs */}
         <div className="flex flex-wrap justify-center gap-4 md:gap-12 mb-16 md:mb-32 border-b border-gray-100 pb-4 md:pb-10 overflow-x-auto no-scrollbar whitespace-nowrap">
@@ -380,7 +419,7 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
               >
                 {cat.name}
                 {activeTab === cat.id && (
-                  <div className="absolute bottom-[-2px] left-0 w-full h-[2px] md:h-[3px] bg-[#CDA235]"></div>
+                  <div className="absolute bottom-[-2px] left-0 w-full h-[2px] md:h-[3px] bg-[#CDA235]" style={{ backgroundColor: menuVisual.accentColor }}></div>
                 )}
               </button>
             ))
@@ -400,7 +439,7 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
               >
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-[-2px] left-0 w-full h-[2px] md:h-[3px] bg-[#CDA235]"></div>
+                  <div className="absolute bottom-[-2px] left-0 w-full h-[2px] md:h-[3px] bg-[#CDA235]" style={{ backgroundColor: menuVisual.accentColor }}></div>
                 )}
               </button>
             ))
@@ -542,24 +581,24 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
       </section>
 
       {/* Seasonal experiences */}
-      <section className="px-6 md:px-20 pb-24 md:pb-40 max-w-[1440px] mx-auto w-full">
+      <section className="px-6 md:px-20 pb-24 md:pb-40 max-w-[1440px] mx-auto w-full" style={{ backgroundColor: seasonalVisual.backgroundColor, paddingTop: toPx(seasonalVisual.paddingTop), paddingBottom: toPx(seasonalVisual.paddingBottom) }}>
         <div className="text-center mb-16 md:mb-20">
-          <span className="text-[#CDA235] text-[12px] md:text-[13px] font-bold tracking-[0.5em] md:tracking-[0.6em] uppercase block mb-4 md:mb-6">{tSeas.tag}</span>
-          <h2 className="text-[40px] md:text-[70px] serif mb-4 md:mb-6 text-[#1a1a1a] tracking-tighter italic leading-none">{tSeas.title}</h2>
-          <div className="w-16 md:w-20 h-0.5 bg-[#CDA235] mx-auto"></div>
+          <span className="text-[#CDA235] text-[12px] md:text-[13px] font-bold tracking-[0.5em] md:tracking-[0.6em] uppercase block mb-4 md:mb-6" style={{ color: seasonalVisual.accentColor }}>{tSeas.tag}</span>
+          <h2 className="text-[40px] md:text-[70px] serif mb-4 md:mb-6 text-[#1a1a1a] tracking-tighter italic leading-none" style={{ color: seasonalVisual.textColor }}>{tSeas.title}</h2>
+          <div className="w-16 md:w-20 h-0.5 bg-[#CDA235] mx-auto" style={{ backgroundColor: seasonalVisual.accentColor }}></div>
         </div>
 
         <div className="max-w-6xl mx-auto relative">
-          <div className="grid lg:grid-cols-5 bg-white shadow-[0_40px_80px_rgba(0,0,0,0.06)] md:shadow-[0_80px_160px_rgba(0,0,0,0.06)] border border-gray-100 overflow-hidden relative group items-stretch">
+          <div className="grid lg:grid-cols-5 bg-white shadow-[0_40px_80px_rgba(0,0,0,0.06)] md:shadow-[0_80px_160px_rgba(0,0,0,0.06)] border border-gray-100 overflow-hidden relative group items-stretch" style={{ backgroundColor: seasonalVisual.surfaceColor, borderColor: seasonalVisual.borderColor }}>
             <div className="lg:col-span-2 relative overflow-hidden min-h-[300px] md:min-h-[450px] lg:min-h-0 bg-[#1a1a1a]">
               <div
                 className="absolute inset-0 img-cover transition-transform duration-[6000ms] group-hover:scale-110"
-                style={{ backgroundImage: `url(${settings.seasonal_img || 'https://i.pixi.mg/i/74e094099766914f4b302a3c.jpg'})` }}
+                style={{ backgroundImage: `url(${seasonalVisual.backgroundImage || settings.seasonal_img || 'https://i.pixi.mg/i/74e094099766914f4b302a3c.jpg'})` }}
               ></div>
-              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors duration-700"></div>
+              <div className="absolute inset-0 group-hover:bg-black/10 transition-colors duration-700" style={{ backgroundColor: seasonalVisual.overlayColor || 'rgba(0,0,0,0.3)' }}></div>
             </div>
 
-            <div className="lg:col-span-3 p-8 md:p-14 lg:p-20 bg-[#faf9f6] flex flex-col justify-center text-left relative">
+            <div className="lg:col-span-3 p-8 md:p-14 lg:p-20 bg-[#faf9f6] flex flex-col justify-center text-left relative" style={{ backgroundColor: seasonalVisual.surfaceColor, color: seasonalVisual.textColor }}>
               <div className="mb-8 md:mb-12">
                 <div className="flex flex-col sm:flex-row justify-between items-baseline mb-3 md:mb-5 gap-2">
                   <h3 className="text-3xl md:text-5xl serif text-[#1a1a1a] tracking-tight italic">{tSeas.menuTitle}</h3>
@@ -613,6 +652,11 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const [events, setEvents] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const homepageVisualConfig = useHomepageVisualConfig();
+  const eventsVisual = getSectionVisualProps(homepageVisualConfig, 'EventsSection');
+  const quoteVisual = getSectionVisualProps(homepageVisualConfig, 'QuoteSection');
+  const newsVisual = getSectionVisualProps(homepageVisualConfig, 'NewsSection');
+  const bookingVisual = getSectionVisualProps(homepageVisualConfig, 'BookingSection');
 
   // ─── Availability state ───────────────────────────────────────────────
   const [totalTables, setTotalTables] = useState(100);
@@ -1120,7 +1164,7 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-wrap gap-4">
                 <button
                   onClick={() => {
                     setBookingStep('initial');
@@ -1161,22 +1205,22 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
   return (
     <div className="flex flex-col bg-[#faf9f6] w-full">
       {/* Events Section */}
-      <section id="events-section" className="relative text-white py-20 md:py-32 px-6 md:px-8 text-center overflow-hidden w-full">
+      <section id="events-section" className="relative text-white py-20 md:py-32 px-6 md:px-8 text-center overflow-hidden w-full" style={{ backgroundColor: eventsVisual.backgroundColor, paddingTop: toPx(eventsVisual.paddingTop), paddingBottom: toPx(eventsVisual.paddingBottom) }}>
         <div
           className="absolute inset-0 z-0 img-cover"
-          style={{ backgroundImage: 'url(https://i.pixi.mg/i/6531ebaa95d551fac6cfe78b.jpg)' }}
+          style={{ backgroundImage: `url(${eventsVisual.backgroundImage || 'https://i.pixi.mg/i/6531ebaa95d551fac6cfe78b.jpg'})` }}
         >
         </div>
-        <div className="absolute inset-0 bg-black/80 z-10 pointer-events-none"></div>
+        <div className="absolute inset-0 z-10 pointer-events-none" style={{ backgroundColor: eventsVisual.overlayColor || 'rgba(0,0,0,0.8)' }}></div>
 
         <div className="relative z-20 max-w-7xl mx-auto flex flex-col items-center px-4">
-          <span className="text-[#CDA235] text-[14px] md:text-[16px] tracking-[0.4em] md:tracking-[0.6em] uppercase font-bold block mb-6 md:mb-10 drop-shadow-lg">{getTransSetting('events_tag') || tEv.tag}</span>
-          <h2 className="text-[40px] md:text-[70px] lg:text-[90px] serif mb-8 md:mb-12 italic font-light tracking-tighter leading-none text-white/95">{getTransSetting('events_title') || tEv.title}</h2>
-          <p className="text-gray-300 text-base md:text-xl mb-12 md:mb-20 max-w-4xl mx-auto leading-relaxed font-light text-center">
+          <span className="text-[#CDA235] text-[14px] md:text-[16px] tracking-[0.4em] md:tracking-[0.6em] uppercase font-bold block mb-6 md:mb-10 drop-shadow-lg" style={{ color: eventsVisual.accentColor }}>{getTransSetting('events_tag') || tEv.tag}</span>
+          <h2 className="text-[40px] md:text-[70px] lg:text-[90px] serif mb-8 md:mb-12 italic font-light tracking-tighter leading-none text-white/95" style={{ color: eventsVisual.textColor }}>{getTransSetting('events_title') || tEv.title}</h2>
+          <p className="text-gray-300 text-base md:text-xl mb-12 md:mb-20 max-w-4xl mx-auto leading-relaxed font-light text-center" style={{ color: eventsVisual.textColor }}>
             {getTransSetting('events_sub') || tEv.sub}
           </p>
 
-          <div className="relative z-20 inline-block border border-[#CDA235]/30 p-10 md:p-16 lg:p-24 bg-white/5 backdrop-blur-2xl shadow-[0_40px_80px_rgba(0,0,0,0.6)] text-center w-full max-w-4xl">
+          <div className="relative z-20 inline-block border border-[#CDA235]/30 p-10 md:p-16 lg:p-24 bg-white/5 backdrop-blur-2xl shadow-[0_40px_80px_rgba(0,0,0,0.6)] text-center w-full max-w-4xl" style={{ borderColor: eventsVisual.borderColor, backgroundColor: eventsVisual.surfaceColor }}>
             <span className="text-[10px] md:text-[11px] tracking-[0.3em] md:tracking-[0.5em] text-[#CDA235] uppercase font-bold block mb-6 md:mb-10">{getTransSetting('events_contact') || tEv.contactForOffer}</span>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 md:gap-10 mb-6 md:mb-8">
               <span className="text-3xl md:text-4xl opacity-35 text-[#CDA235]">📞</span>
@@ -1189,8 +1233,8 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
       </section>
 
       {/* Quote Section */}
-      <section className="py-14 md:py-20 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden">
-        <div className="max-w-6xl mx-auto px-4 text-[#1a1a1a]">
+      <section className="py-14 md:py-20 px-6 md:px-8 text-center bg-white border-y border-gray-50 w-full overflow-hidden" style={{ backgroundColor: quoteVisual.backgroundColor, paddingTop: toPx(quoteVisual.paddingTop), paddingBottom: toPx(quoteVisual.paddingBottom), borderColor: quoteVisual.borderColor }}>
+        <div className="max-w-6xl mx-auto px-4 text-[#1a1a1a]" style={{ color: quoteVisual.textColor }}>
           <span className="text-5xl md:text-7xl serif text-[#CDA235]/10 block mb-8 md:mb-12 select-none opacity-50">“</span>
 
           <div className="relative min-h-[100px] md:min-h-[80px] flex items-center justify-center">
@@ -1236,11 +1280,12 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
       </section>
 
       {/* News Section */}
-      <section className="px-6 md:px-20 py-20 md:py-32 max-w-[1440px] mx-auto w-full bg-white text-left">
+      <div className="w-full" style={{ backgroundColor: newsVisual.backgroundColor || "#FFFFFF" }}>
+      <section className="px-6 md:px-20 py-20 md:py-32 max-w-[1440px] mx-auto w-full text-left" style={{ paddingTop: toPx(newsVisual.paddingTop), paddingBottom: toPx(newsVisual.paddingBottom) }}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-20 gap-8">
           <div>
-            <h2 className="text-4xl md:text-6xl serif text-[#1a1a1a] tracking-tighter">{tNews.title}</h2>
-            <p className="text-[10px] md:text-[11px] tracking-[0.2em] text-[#CDA235] uppercase font-bold mt-2">{tNews.tag}</p>
+            <h2 className="text-4xl md:text-6xl serif text-[#1a1a1a] tracking-tighter" style={{ color: newsVisual.textColor }}>{tNews.title}</h2>
+            <p className="text-[10px] md:text-[11px] tracking-[0.2em] text-[#CDA235] uppercase font-bold mt-2" style={{ color: newsVisual.accentColor }}>{tNews.tag}</p>
           </div>
           <button className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] border-b-2 border-[#CDA235] pb-2">{tNews.readAll}</button>
         </div>
@@ -1259,8 +1304,8 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
                 <div className="absolute top-4 right-4 bg-[#CDA235] text-white px-4 py-2 text-[9px] font-bold uppercase tracking-[0.2em]">{tNews.eventTag}</div>
               </div>
               <span className="text-[9px] md:text-[10px] font-bold text-[#CDA235] tracking-[0.2em] block mb-4 uppercase">{event.start_date ? new Date(event.start_date).toLocaleDateString() : ''}</span>
-              <h3 className="text-xl md:text-2xl serif mb-4 group-hover:underline underline-offset-8 transition-all leading-tight text-[#1a1a1a]">{event.title}</h3>
-              <p className="text-[13px] text-gray-500 font-light leading-relaxed line-clamp-3">{event.details?.paragraph_1 || event.description}</p>
+              <h3 className="text-xl md:text-2xl serif mb-4 group-hover:underline underline-offset-8 transition-all leading-tight text-[#1a1a1a]">{language !== 'da' && event[`title_${language}`] ? event[`title_${language}`] : event.title}</h3>
+              <p className="text-[13px] text-gray-500 font-light leading-relaxed line-clamp-3">{(() => { if (language !== 'da') { const dl = event[`details_${language}`]; if (dl?.paragraph_1) return dl.paragraph_1; if (event[`description_${language}`]) return event[`description_${language}`]; } return event.details?.paragraph_1 || event.description; })()}</p>
             </div>
           )) : (
             [
@@ -1287,18 +1332,19 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
           )}
         </div>
       </section>
+      </div>
 
       {/* Booking Section */}
-      <section id="booking-section" className="bg-[#faf9f6] py-20 md:py-32 px-6 md:px-8 flex flex-col items-center border-t border-[#f2f1ed] w-full">
+      <section id="booking-section" className="bg-[#faf9f6] py-20 md:py-32 px-6 md:px-8 flex flex-col items-center border-t border-[#f2f1ed] w-full" style={{ backgroundColor: bookingVisual.backgroundColor, paddingTop: toPx(bookingVisual.paddingTop), paddingBottom: toPx(bookingVisual.paddingBottom), borderColor: bookingVisual.borderColor }}>
         <div className="max-w-[1440px] w-full text-center px-4">
-          <span className="text-[#CDA235] text-[11px] md:text-[12px] font-bold tracking-[0.5em] md:tracking-[0.8em] uppercase block mb-8 md:mb-12">{tBook.tag}</span>
-          <h2 className="text-[40px] md:text-[80px] serif mb-6 md:mb-10 tracking-tighter text-[#1a1a1a] leading-none">{tBook.title}</h2>
-          <p className="text-lg md:text-xl text-gray-500 mb-12 md:mb-20 max-w-2xl mx-auto font-light leading-relaxed italic">
+          <span className="text-[#CDA235] text-[11px] md:text-[12px] font-bold tracking-[0.5em] md:tracking-[0.8em] uppercase block mb-8 md:mb-12" style={{ color: bookingVisual.accentColor }}>{tBook.tag}</span>
+          <h2 className="text-[40px] md:text-[80px] serif mb-6 md:mb-10 tracking-tighter text-[#1a1a1a] leading-none" style={{ color: bookingVisual.textColor }}>{tBook.title}</h2>
+          <p className="text-lg md:text-xl text-gray-500 mb-12 md:mb-20 max-w-2xl mx-auto font-light leading-relaxed italic" style={{ color: bookingVisual.textColor }}>
             {tBook.sub}
           </p>
 
-          <div className="bg-white p-6 md:p-12 shadow-[0_40px_80px_rgba(0,0,0,0.06)] border border-gray-100 max-w-4xl mx-auto relative overflow-hidden w-full">
-            <div className="absolute top-0 left-0 w-full h-[4px] md:h-[6px] bg-[#CDA235]"></div>
+          <div className="bg-white p-6 md:p-12 shadow-[0_40px_80px_rgba(0,0,0,0.06)] border border-gray-100 max-w-4xl mx-auto relative overflow-hidden w-full" style={{ backgroundColor: bookingVisual.surfaceColor, borderColor: bookingVisual.borderColor }}>
+            <div className="absolute top-0 left-0 w-full h-[4px] md:h-[6px] bg-[#CDA235]" style={{ backgroundColor: bookingVisual.accentColor }}></div>
 
             {renderBookingStep()}
           </div>
@@ -1311,3 +1357,4 @@ export const HomePart3: React.FC<HomePartProps & { onBookingConfirmed: (data: Bo
     </div>
   );
 };
+

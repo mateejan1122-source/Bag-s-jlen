@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Edit3, Trash2, Globe, Image as ImageIcon } from 'lucide-react';
 import DefaultEditor from 'react-simple-wysiwyg';
+import { LanguageTabs, LanguageCode } from '../../components/admin/LanguageTabs';
+import { autoTranslateFields } from '../../lib/translation';
 
 export const PagesTab: React.FC = () => {
     const [pages, setPages] = useState<any[]>([]);
@@ -10,8 +12,9 @@ export const PagesTab: React.FC = () => {
     // Page Editing States
     const [isEditingPage, setIsEditingPage] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
-    const [activeLang, setActiveLang] = useState<'da' | 'en' | 'de'>('da');
+    const [activeLang, setActiveLang] = useState<LanguageCode>('da');
     const [isTranslating, setIsTranslating] = useState(false);
+    const [forceOverwrite, setForceOverwrite] = useState(false);
     
     const [editingPageDetails, setEditingPageDetails] = useState({ 
         id: '', title: '', title_en: '', title_de: '', slug: '', is_published: true, 
@@ -35,52 +38,32 @@ export const PagesTab: React.FC = () => {
     const handleAutoTranslate = async () => {
         setIsTranslating(true);
         try {
-            const sourceLang = activeLang;
-            const targetLangs = ['da', 'en', 'de'].filter(l => l !== sourceLang);
+            const { data: settingsData } = await supabase.from('settings').select('value').eq('key', 'deepl_api_key').single();
+            const apiKey = settingsData?.value || '';
+
             const fieldsToTranslate = ['title', 'content', 'seo_title', 'meta_description'];
             
-            const newDetails = { ...editingPageDetails };
-            let hasText = false;
+            const fields = fieldsToTranslate.map(field => {
+                const sourceKey = activeLang === 'da' ? field : `${field}_${activeLang}`;
+                return {
+                    sourceKey,
+                    sourceText: editingPageDetails[sourceKey as keyof typeof editingPageDetails] as string || '',
+                    targets: ['da', 'en', 'de']
+                        .filter(l => l !== activeLang)
+                        .map(l => ({
+                            lang: l as LanguageCode,
+                            key: l === 'da' ? field : `${field}_${l}`,
+                            currentText: editingPageDetails[(l === 'da' ? field : `${field}_${l}`) as keyof typeof editingPageDetails] as string || ''
+                        }))
+                };
+            });
 
-            for (const targetLang of targetLangs) {
-                for (const field of fieldsToTranslate) {
-                    const sourceKey = sourceLang === 'da' ? field : `${field}_${sourceLang}`;
-                    const targetKey = targetLang === 'da' ? field : `${field}_${targetLang}`;
-                    const text = newDetails[sourceKey as keyof typeof newDetails] as string;
-                    
-                    // Simple HTML preservation attempt for content translation (the API mostly handles tags OK)
-                    if (text && text.trim()) {
-                        hasText = true;
-                        const deepLTarget = targetLang === 'en' ? 'EN-GB' : targetLang.toUpperCase();
-                        const { data, error } = await supabase.functions.invoke('translate', {
-                            body: {
-                                text: [text],
-                                target_lang: deepLTarget
-                            }
-                        });
-                        
-                        if (error) {
-                            console.error('DeepL Translation API Error:', error);
-                            continue;
-                        }
-                        
-                        if (data?.translations?.[0]?.text) {
-                            (newDetails as any)[targetKey] = data.translations[0].text;
-                        }
-                    }
-                }
-            }
-
-            if (!hasText) {
-                alert('Please enter text to translate.');
-                return;
-            }
-
-            setEditingPageDetails(newDetails);
+            const updates = await autoTranslateFields(apiKey, activeLang, fields, forceOverwrite);
+            setEditingPageDetails(prev => ({ ...prev, ...updates }));
             alert('Translation complete!');
-        } catch (err) {
-            console.error(err);
-            alert('Failed to auto-translate.');
+        } catch (error: any) {
+            console.error('Translation error:', error);
+            alert(error.message || 'Failed to auto-translate.');
         } finally {
             setIsTranslating(false);
         }
@@ -188,24 +171,23 @@ export const PagesTab: React.FC = () => {
             <div className="bg-white p-8 border border-gray-100 shadow-xl max-w-2xl animate-in fade-in">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-2xl serif italic">{editingPageDetails.id ? 'Edit Page' : 'Create New Page'}</h3>
-                    <div className="flex bg-gray-100 p-1 rounded-sm shadow-inner">
-                        <button type="button" onClick={() => setActiveLang('da')} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-sm ${activeLang === 'da' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}>DA</button>
-                        <button type="button" onClick={() => setActiveLang('en')} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-sm ${activeLang === 'en' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}>EN</button>
-                        <button type="button" onClick={() => setActiveLang('de')} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-sm ${activeLang === 'de' ? 'bg-white shadow text-[#CDA235]' : 'text-gray-500 hover:text-gray-800'}`}>DE</button>
-                    </div>
                 </div>
 
-                <div className="flex justify-between items-center bg-gray-50 p-4 border border-gray-100 mb-8 rounded-sm">
-                    <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Auto-Translation Settings</div>
-                    <button type="button" onClick={handleAutoTranslate} disabled={isTranslating} className="text-[10px] bg-white border border-gray-200 px-4 py-2 font-bold uppercase tracking-widest text-[#CDA235] hover:border-[#CDA235] transition-colors flex items-center gap-2 disabled:opacity-50">
-                        {isTranslating ? 'Translating...' : '✨ Auto-Translate All Fields'}
-                    </button>
-                </div>
+                <LanguageTabs 
+                    activeLang={activeLang}
+                    onLangChange={setActiveLang}
+                    onAutoTranslate={handleAutoTranslate}
+                    isTranslating={isTranslating}
+                    showAutoTranslate={true}
+                    forceOverwrite={forceOverwrite}
+                    onOverwriteChange={setForceOverwrite}
+                />
 
-                <form onSubmit={handleSavePage} className="space-y-6">
+                <form onSubmit={handleSavePage} className="space-y-6 mt-6">
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Page Title</label>
                         <input
+                            key={`title-${activeLang}`}
                             required
                             type="text"
                             value={getField('title')}
@@ -237,6 +219,7 @@ export const PagesTab: React.FC = () => {
                         </div>
                         <div className="bg-white border border-gray-200 rounded-md overflow-hidden min-h-[400px]">
                             <DefaultEditor
+                                key={`content-${activeLang}`}
                                 value={getField('content')}
                                 onChange={(e) => setField('content', e.target.value)}
                                 className="dynamic-content !min-h-[400px] border-none"
@@ -275,6 +258,7 @@ export const PagesTab: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">SEO Page Title</label>
                                 <input
+                                    key={`seo_title-${activeLang}`}
                                     type="text"
                                     value={getField('seo_title')}
                                     onChange={(e) => setField('seo_title', e.target.value)}
@@ -286,6 +270,7 @@ export const PagesTab: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Meta Description</label>
                                 <textarea
+                                    key={`meta_description-${activeLang}`}
                                     value={getField('meta_description')}
                                     onChange={(e) => setField('meta_description', e.target.value)}
                                     className="w-full text-base border-b border-gray-200 py-3 focus:outline-none focus:border-[#CDA235] transition-colors min-h-[80px]"

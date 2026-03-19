@@ -239,6 +239,27 @@ export const SettingsTab: React.FC = () => {
                                             />
                                             <p className="text-[10px] text-gray-400 mt-2">Required for AI Voice Generation (Text-to-Speech).</p>
                                         </div>
+                                        <div>
+                                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">DeepL API Key <span className="text-[#CDA235]">(Translation)</span></label>
+                                            <input
+                                                type="password"
+                                                value={settings['deepl_api_key'] || ''}
+                                                onChange={e => handleSettingChange('deepl_api_key', e.target.value)}
+                                                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx"
+                                                className="w-full text-sm border-b border-gray-300 py-2 focus:outline-none focus:border-[#CDA235] transition-colors bg-transparent"
+                                            />
+                                            <p className="text-[10px] text-gray-400 mt-2">
+                                                Required for Auto-Translate in the Footer tab. Get a free key at{' '}
+                                                <a href="https://www.deepl.com/pro-api" target="_blank" rel="noreferrer" className="text-[#CDA235] underline">deepl.com/pro-api</a>.
+                                                Free tier: 500,000 chars/month.
+                                            </p>
+                                            {settings['deepl_api_key'] && (
+                                                <div className="mt-3 flex items-center gap-2">
+                                                    <span className="inline-block w-2 h-2 rounded-full bg-[#CDA235] animate-pulse"></span>
+                                                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">API Key Configured</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="pt-8 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-8">

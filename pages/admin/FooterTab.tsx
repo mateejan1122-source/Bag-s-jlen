@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Save } from 'lucide-react';
+import { Save, Loader2, CheckCircle2 } from 'lucide-react';
+import { LanguageTabs, LanguageCode } from '../../components/admin/LanguageTabs';
+import { autoTranslateFields } from '../../lib/translation';
 
 export const FooterTab: React.FC = () => {
     const [settings, setSettings] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [translating, setTranslating] = useState<boolean>(false);
+    const [activeLang, setActiveLang] = useState<LanguageCode>('da');
+    const [forceOverwrite, setForceOverwrite] = useState(false);
 
     useEffect(() => {
         fetchSettings();
@@ -38,10 +43,10 @@ export const FooterTab: React.FC = () => {
                 'footer_logo', 'footer_logo_size',
                 'contact_address', 'contact_phone', 'contact_email',
                 'contact_instagram', 'contact_facebook',
-                'hours_monday', 'hours_tuesday', 'hours_wednesday',
-                'hours_thursday', 'hours_friday', 'hours_saturday', 'hours_sunday',
-                'hours_tuesday_saturday', 'hours_lunch_saturday', 'hours_sunday_monday',
-                'hours_notes', 'general_copyright',
+                'hours_tuesday_saturday', 'hours_tuesday_saturday_en', 'hours_tuesday_saturday_de',
+                'hours_lunch_saturday', 'hours_lunch_saturday_en', 'hours_lunch_saturday_de',
+                'hours_sunday_monday', 'hours_sunday_monday_en', 'hours_sunday_monday_de',
+                'general_copyright', 'general_copyright_en', 'general_copyright_de',
             ];
 
             const upsertData = footerKeys
@@ -64,6 +69,82 @@ export const FooterTab: React.FC = () => {
             alert('Failed to save settings.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleAutoTranslate = async () => {
+        setTranslating(true);
+        try {
+            const updates = await autoTranslateFields(
+                settings['deepl_api_key'] || '',
+                activeLang,
+                [
+                    {
+                        sourceKey: activeLang === 'da' ? 'footer_desc' : `footer_desc_${activeLang}`,
+                        sourceText: settings[activeLang === 'da' ? 'footer_desc' : `footer_desc_${activeLang}`] || '',
+                        targets: ['da', 'en', 'de']
+                            .filter(l => l !== activeLang)
+                            .map(l => ({
+                                lang: l as LanguageCode,
+                                key: l === 'da' ? 'footer_desc' : `footer_desc_${l}`,
+                                currentText: settings[l === 'da' ? 'footer_desc' : `footer_desc_${l}`] || ''
+                            }))
+                    },
+                    {
+                        sourceKey: activeLang === 'da' ? 'general_copyright' : `general_copyright_${activeLang}`,
+                        sourceText: settings[activeLang === 'da' ? 'general_copyright' : `general_copyright_${activeLang}`] || '',
+                        targets: ['da', 'en', 'de']
+                            .filter(l => l !== activeLang)
+                            .map(l => ({
+                                lang: l as LanguageCode,
+                                key: l === 'da' ? 'general_copyright' : `general_copyright_${l}`,
+                                currentText: settings[l === 'da' ? 'general_copyright' : `general_copyright_${l}`] || ''
+                            }))
+                    },
+                    {
+                        sourceKey: activeLang === 'da' ? 'hours_tuesday_saturday' : `hours_tuesday_saturday_${activeLang}`,
+                        sourceText: settings[activeLang === 'da' ? 'hours_tuesday_saturday' : `hours_tuesday_saturday_${activeLang}`] || '',
+                        targets: ['da', 'en', 'de']
+                            .filter(l => l !== activeLang)
+                            .map(l => ({
+                                lang: l as LanguageCode,
+                                key: l === 'da' ? 'hours_tuesday_saturday' : `hours_tuesday_saturday_${l}`,
+                                currentText: settings[l === 'da' ? 'hours_tuesday_saturday' : `hours_tuesday_saturday_${l}`] || ''
+                            }))
+                    },
+                    {
+                        sourceKey: activeLang === 'da' ? 'hours_lunch_saturday' : `hours_lunch_saturday_${activeLang}`,
+                        sourceText: settings[activeLang === 'da' ? 'hours_lunch_saturday' : `hours_lunch_saturday_${activeLang}`] || '',
+                        targets: ['da', 'en', 'de']
+                            .filter(l => l !== activeLang)
+                            .map(l => ({
+                                lang: l as LanguageCode,
+                                key: l === 'da' ? 'hours_lunch_saturday' : `hours_lunch_saturday_${l}`,
+                                currentText: settings[l === 'da' ? 'hours_lunch_saturday' : `hours_lunch_saturday_${l}`] || ''
+                            }))
+                    },
+                    {
+                        sourceKey: activeLang === 'da' ? 'hours_sunday_monday' : `hours_sunday_monday_${activeLang}`,
+                        sourceText: settings[activeLang === 'da' ? 'hours_sunday_monday' : `hours_sunday_monday_${activeLang}`] || '',
+                        targets: ['da', 'en', 'de']
+                            .filter(l => l !== activeLang)
+                            .map(l => ({
+                                lang: l as LanguageCode,
+                                key: l === 'da' ? 'hours_sunday_monday' : `hours_sunday_monday_${l}`,
+                                currentText: settings[l === 'da' ? 'hours_sunday_monday' : `hours_sunday_monday_${l}`] || ''
+                            }))
+                    }
+                ],
+                forceOverwrite
+            );
+            
+            // Apply updates
+            setSettings(prev => ({ ...prev, ...updates }));
+            alert('Auto-translation complete! Review the fields and save.');
+        } catch (error: any) {
+            alert(error.message || 'Translation failed.');
+        } finally {
+            setTranslating(false);
         }
     };
 
@@ -95,7 +176,18 @@ export const FooterTab: React.FC = () => {
 
                     {/* Brand / Description */}
                     <div className={cardClass}>
-                        <h3 className="text-sm font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-8 border-b border-gray-100 pb-4">Brand</h3>
+                        <h3 className="text-sm font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-6">Brand</h3>
+                        
+                        <LanguageTabs 
+                            activeLang={activeLang}
+                            onLangChange={setActiveLang}
+                            onAutoTranslate={handleAutoTranslate}
+                            isTranslating={translating}
+                            showAutoTranslate={true}
+                            forceOverwrite={forceOverwrite}
+                            onOverwriteChange={setForceOverwrite}
+                        />
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div>
                                 <label className={labelClass}>Footer Logo URL</label>
@@ -108,20 +200,40 @@ export const FooterTab: React.FC = () => {
                                 <input type="number" value={settings['footer_logo_size'] || ''} onChange={e => set('footer_logo_size', e.target.value)}
                                     placeholder="e.g. 48" className={inputClass} />
                             </div>
-                            <div>
-                                <label className={labelClass}>Tagline / Description (Danish)</label>
-                                <textarea rows={3} value={settings['footer_desc'] || ''} onChange={e => set('footer_desc', e.target.value)}
-                                    placeholder="Short restaurant description shown under the logo..." className={`${inputClass} resize-none`} />
+                            <div className="md:col-span-2">
+                                <label className={labelClass}>Tagline / Description ({activeLang === 'da' ? 'Danish 🇩🇰' : activeLang === 'en' ? 'English 🇬🇧' : 'German 🇩🇪'})</label>
+                                <textarea
+                                    className={`${inputClass} resize-none ${activeLang !== 'da' ? 'hidden' : ''}`}
+                                    rows={3}
+                                    value={settings['footer_desc'] || ''}
+                                    onChange={e => set('footer_desc', e.target.value)}
+                                    placeholder="Short restaurant description shown under the logo..."
+                                />
+                                <textarea
+                                    className={`${inputClass} resize-none ${activeLang !== 'en' ? 'hidden' : ''}`}
+                                    rows={3}
+                                    value={settings['footer_desc_en'] || ''}
+                                    onChange={e => set('footer_desc_en', e.target.value)}
+                                    placeholder="English version..."
+                                />
+                                <textarea
+                                    className={`${inputClass} resize-none ${activeLang !== 'de' ? 'hidden' : ''}`}
+                                    rows={3}
+                                    value={settings['footer_desc_de'] || ''}
+                                    onChange={e => set('footer_desc_de', e.target.value)}
+                                    placeholder="Deutsche Version..."
+                                />
                             </div>
-                            <div>
-                                <label className={labelClass}>Tagline / Description (English)</label>
-                                <textarea rows={3} value={settings['footer_desc_en'] || ''} onChange={e => set('footer_desc_en', e.target.value)}
-                                    placeholder="English version..." className={`${inputClass} resize-none`} />
-                            </div>
-                            <div>
-                                <label className={labelClass}>Copyright Line</label>
-                                <input type="text" value={settings['general_copyright'] || ''} onChange={e => set('general_copyright', e.target.value)}
-                                    placeholder={`© ${new Date().getFullYear()} BAG SØJLEN. DANSK & FRANSK KØKKEN.`} className={inputClass} />
+                            <div className="md:col-span-2">
+                                <label className={labelClass}>Copyright Line ({activeLang === 'da' ? 'Danish 🇩🇰' : activeLang === 'en' ? 'English 🇬🇧' : 'German 🇩🇪'})</label>
+                                <input
+                                    key={`general_copyright-${activeLang}`}
+                                    type="text"
+                                    value={settings[activeLang === 'da' ? 'general_copyright' : `general_copyright_${activeLang}`] || ''}
+                                    onChange={e => set(activeLang === 'da' ? 'general_copyright' : `general_copyright_${activeLang}`, e.target.value)}
+                                    placeholder={activeLang === 'da' ? `© ${new Date().getFullYear()} BAG SØJLEN. DANSK & FRANSK KØKKEN.` : activeLang === 'en' ? `© ${new Date().getFullYear()} BAG SØJLEN. DANISH & FRENCH KITCHEN.` : `© ${new Date().getFullYear()} BAG SØJLEN. DÄNISCHE & FRANZÖSISCHE KÜCHE.`}
+                                    className={inputClass}
+                                />
                             </div>
                         </div>
                     </div>
@@ -171,38 +283,25 @@ export const FooterTab: React.FC = () => {
                         <p className="text-[11px] text-gray-400 mb-8">These values are displayed in the website footer. If left empty, default values are shown (e.g. "17.00 – 22.00").</p>
                         <div className="space-y-6">
                             {[
-                                { key: 'hours_tuesday_saturday', label: 'Tuesday – Saturday', ph: '17.00 – 22.00' },
-                                { key: 'hours_lunch_saturday', label: 'Lunch Saturday', ph: '12.00 – 15.00' },
-                                { key: 'hours_sunday_monday', label: 'Sunday & Monday', ph: 'Closed. We open by appointment.' },
-                            ].map(({ key, label, ph }) => (
-                                <div key={key} className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 border-b border-gray-50 pb-4">
-                                    <label className="text-[11px] font-bold uppercase tracking-widest text-[#CDA235] md:col-span-1">{label}</label>
-                                    <input type="text" value={settings[key] || ''} onChange={e => set(key, e.target.value)}
-                                        placeholder={ph}
-                                        className="md:col-span-3 text-sm border border-gray-200 px-4 py-2.5 focus:outline-none focus:border-[#CDA235] transition-colors" />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Opening Hours — Day by Day */}
-                    <div className={cardClass}>
-                        <h3 className="text-sm font-bold tracking-[0.3em] uppercase text-[#CDA235] mb-2 border-b border-gray-100 pb-4">Opening Hours — Day by Day</h3>
-                        <p className="text-[11px] text-gray-400 mb-8">Used as a fallback if grouped hours above are empty.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                            {(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).map(day => (
-                                <div key={day} className="flex items-center gap-4 border-b border-gray-50 pb-4">
-                                    <label className="text-[11px] uppercase tracking-widest text-gray-700 font-bold w-28 shrink-0">{day}</label>
-                                    <input type="text" value={settings[`hours_${day.toLowerCase()}`] || ''}
-                                        onChange={e => set(`hours_${day.toLowerCase()}`, e.target.value)}
-                                        placeholder="e.g. 17.00 - 22.00 or Closed" className="flex-1 text-sm border border-gray-200 px-3 py-2 focus:outline-none focus:border-[#CDA235] transition-colors" />
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-8">
-                            <label className={labelClass}>Special Notes / Holiday Closures</label>
-                            <textarea rows={3} value={settings['hours_notes'] || ''} onChange={e => set('hours_notes', e.target.value)}
-                                placeholder="e.g. Closed December 24th - 26th" className={`${inputClass} resize-none`} />
+                                { daKey: 'hours_tuesday_saturday', label: 'Tuesday – Saturday', ph: '17.00 – 22.00' },
+                                { daKey: 'hours_lunch_saturday', label: 'Lunch Saturday', ph: '12.00 – 15.00' },
+                                { daKey: 'hours_sunday_monday', label: 'Sunday & Monday', ph: 'Closed. We open by appointment.' },
+                            ].map(({ daKey, label, ph }) => {
+                                const currentKey = activeLang === 'da' ? daKey : `${daKey}_${activeLang}`;
+                                return (
+                                    <div key={daKey} className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 border-b border-gray-50 pb-4">
+                                        <label className="text-[11px] font-bold uppercase tracking-widest text-[#CDA235] md:col-span-1">{label} ({activeLang.toUpperCase()})</label>
+                                        <input
+                                            key={`${currentKey}-${activeLang}`}
+                                            type="text"
+                                            value={settings[currentKey] || ''}
+                                            onChange={e => set(currentKey, e.target.value)}
+                                            placeholder={ph}
+                                            className="md:col-span-3 text-sm border border-gray-200 px-4 py-2.5 focus:outline-none focus:border-[#CDA235] transition-colors"
+                                        />
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
 
