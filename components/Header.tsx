@@ -17,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
   const [headerPages, setHeaderPages] = useState<any[]>([]);
   const [headerLogo, setHeaderLogo] = useState<string | null>(null);
   const [headerLogoSize, setHeaderLogoSize] = useState<string | null>(null);
+  const [headerBgScale, setHeaderBgScale] = useState<number>(1);
   const t = translations[language].nav;
 
   React.useEffect(() => {
@@ -44,6 +45,14 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
       .then(({ data }) => {
         if (data && data.value) setHeaderLogoSize(data.value);
       });
+
+    supabase.from('settings')
+      .select('value')
+      .eq('key', 'header_bg_scale')
+      .single()
+      .then(({ data }) => {
+        if (data && data.value) setHeaderBgScale(parseFloat(data.value) || 1);
+      });
   }, []);
 
   const handleScrollTo = (id: string) => {
@@ -57,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({ onBookingStart, language, onLang
   };
 
   return (
-    <header className="py-4 px-6 md:px-12 bg-[#000000] sticky top-0 z-50 border-b border-white/5">
+    <header className="py-4 px-6 md:px-12 bg-[#000000] sticky top-0 z-50 border-b border-white/5" style={{ paddingTop: `${1 * headerBgScale}rem`, paddingBottom: `${1 * headerBgScale}rem` }}>
       <div className="max-w-[1440px] mx-auto flex items-center justify-between">
         {/* Left: Logo */}
         <div className="flex justify-start items-center">

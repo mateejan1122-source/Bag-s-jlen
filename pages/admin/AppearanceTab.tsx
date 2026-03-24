@@ -31,7 +31,8 @@ export const AppearanceTab: React.FC = () => {
             const upsertData = [
                 { key: 'font_scale_menu', value: settings.font_scale_menu || '1', category: 'general' },
                 { key: 'font_scale_headings', value: settings.font_scale_headings || '1', category: 'general' },
-                { key: 'font_scale_body', value: settings.font_scale_body || '1', category: 'general' }
+                { key: 'font_scale_body', value: settings.font_scale_body || '1', category: 'general' },
+                { key: 'header_bg_scale', value: settings.header_bg_scale || '1', category: 'general' }
             ];
 
             const { error } = await supabase.from('settings').upsert(upsertData, { onConflict: 'key' });
@@ -122,6 +123,24 @@ export const AppearanceTab: React.FC = () => {
                                 className="w-full accent-[#CDA235] h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                             />
                             <p className="text-xs text-gray-400 font-light leading-relaxed">Adjust this slider to universally scale regular text sizes outside Event & T&C pages.</p>
+                        </div>
+
+                        {/* Header Background Scale */}
+                        <div className="space-y-4 max-w-xl mt-6">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-[10px] uppercase tracking-widest text-[#CDA235] font-bold">Header Background Size Scale</label>
+                                <span className="text-sm font-bold text-gray-500">{settings.header_bg_scale || '1'}x</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0.5"
+                                max="2.5"
+                                step="0.05"
+                                value={settings.header_bg_scale || '1'}
+                                onChange={e => updateSetting('header_bg_scale', e.target.value)}
+                                className="w-full accent-[#CDA235] h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <p className="text-xs text-gray-400 font-light leading-relaxed">Adjust this slider to increase or decrease the height of the black header background.</p>
                         </div>
                     </div>
                 </div>

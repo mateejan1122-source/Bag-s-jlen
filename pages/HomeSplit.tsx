@@ -11,6 +11,35 @@ interface HomePartProps {
   language: Language;
 }
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const formatHistoryHtml = (value: string) => {
+  if (!value) return '';
+  if (/<[a-z][\s\S]*>/i.test(value)) {
+    return value;
+  }
+
+  return value
+    .split(/\n\s*\n/) // Split by double newlines for paragraphs
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => {
+      // Replace single newlines within a paragraph with <br />
+      const htmlContent = paragraph
+        .split('\n')
+        .map(line => escapeHtml(line.trim()))
+        .join('<br />');
+      return `<p>${htmlContent}</p>`;
+    })
+    .join('');
+};
+
 export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateToEvent, language }) => {
   const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(true);
@@ -18,6 +47,7 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
   const videoRef = useRef<HTMLVideoElement>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [featuredEvent, setFeaturedEvent] = useState<any | null>(null);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
   const toggleMute = () => setIsMuted(!isMuted);
   const togglePlay = () => {
@@ -97,12 +127,26 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
   const heroEyebrow = heroContent.eyebrow || getTransSetting('hero_welcome') || tHero.welcome;
   const heroTitle = heroContent.title || getTransSetting('hero_title') || 'Bag Sojlen';
   const heroSubtitle = heroContent.subtitle || getTransSetting('hero_subtitle') || tHero.sub;
-  const heroButtons = heroContent.buttons && heroContent.buttons.length > 0
+  const rawHeroButtons = heroContent.buttons && heroContent.buttons.length > 0
     ? heroContent.buttons
     : [
-        { label: getTransSetting('hero_btn_book') || tHero.book, action: 'book', variant: 'primary' },
-        { label: getTransSetting('hero_btn_menu') || tHero.seeMenu, action: 'menu', variant: 'secondary' },
+        { label: tHero.book, action: 'book', variant: 'primary' },
+        { label: tHero.seeMenu, action: 'menu', variant: 'secondary' },
       ];
+
+  const heroButtons = rawHeroButtons.map((btn: any, idx: number) => {
+    let translatedLabel = btn.label;
+    if (idx === 0 && (btn.label === 'Book Table' || btn.label === tHero.book)) {
+      translatedLabel = getTransSetting('hero_btn_book') || tHero.book;
+    }
+    if (idx === 1 && (btn.label === 'See Menu' || btn.label === tHero.seeMenu)) {
+      translatedLabel = getTransSetting('hero_btn_menu') || tHero.seeMenu;
+    }
+    return { ...btn, label: translatedLabel };
+  });
+
+  const historyIntroHtml = formatHistoryHtml(getTransSetting('history_text1') || tHist.text1);
+  const historyFullHtml = formatHistoryHtml(getTransSetting('history_full_text') || '');
 
   const handleHeroButtonClick = (button: { action?: string; href?: string }) => {
     if (button.action === 'book') {
@@ -274,18 +318,17 @@ export const HomePart1: React.FC<HomePartProps> = ({ onBookingStart, onNavigateT
           <h2 className="text-4xl md:text-5xl lg:text-7xl serif mb-6 md:mb-12 text-[#1a1a1a] tracking-tighter leading-none" style={{ color: historyVisual.textColor }}>
             {getTransSetting('history_title') || tHist.title}
           </h2>
-          <div className="space-y-4 md:space-y-8 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl" style={{ color: historyVisual.textColor }}>
-            <p>{getTransSetting('history_text1') || tHist.text1}</p>
+          <div className="space-y-4 md:space-y-6 text-[14px] md:text-[15px] text-gray-600 leading-relaxed font-light max-w-xl [&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic" style={{ color: historyVisual.textColor }}>
+            <div dangerouslySetInnerHTML={{ __html: historyIntroHtml }} />
+            <div className={`transition-all duration-700 overflow-hidden ${isHistoryExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+               <div className="mt-4 md:mt-6 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic" dangerouslySetInnerHTML={{ __html: historyFullHtml }} />
+            </div>
             <button
               type="button"
-              onClick={() => {
-                const defaultSearchLink = language === 'da' ? '/vores-historie' : language === 'de' ? '/unsere-geschichte' : '/our-history';
-                const link = getTransSetting('history_link_url') || defaultSearchLink;
-                if (link) navigate(link);
-              }}
-              className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start cursor-pointer" style={{ color: historyVisual.accentColor, borderColor: historyVisual.accentColor }}
+              onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+              className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.4em] text-[#CDA235] border-b-[2px] border-[#CDA235]/20 pb-2 hover:border-[#CDA235] transition-all mt-6 md:mt-8 inline-block self-start cursor-pointer flex items-center gap-2" style={{ color: historyVisual.accentColor, borderColor: historyVisual.accentColor }}
             >
-              {getTransSetting('history_readMore') || tHist.readMore}
+              {isHistoryExpanded ? (language === 'da' ? 'LÆS MINDRE' : language === 'de' ? 'WENIGER LESEN' : 'READ LESS') : (getTransSetting('history_readMore') || tHist.readMore)}
             </button>
           </div>
         </div>
@@ -602,7 +645,7 @@ export const HomePart2: React.FC<HomePartProps> = ({ onBookingStart, language })
               <div className="mb-8 md:mb-12">
                 <div className="flex flex-col sm:flex-row justify-between items-baseline mb-3 md:mb-5 gap-2">
                   <h3 className="text-3xl md:text-5xl serif text-[#1a1a1a] tracking-tight italic">{tSeas.menuTitle}</h3>
-                  <div className="text-3xl md:text-4xl font-black text-[#CDA235] serif italic">248,-</div>
+                  <div className="text-3xl md:text-4xl font-black text-[#CDA235] serif italic">248</div>
                 </div>
                 <p className="text-[11px] md:text-[12px] tracking-[0.3em] md:tracking-[0.4em] text-gray-400 uppercase font-bold border-l-4 border-[#CDA235] pl-4 md:pl-5">{tSeas.menuSub}</p>
               </div>
